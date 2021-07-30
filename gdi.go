@@ -83,14 +83,25 @@ func (gdi *GDIPool) Build() *GDIPool {
 
 func (gdi *GDIPool) build(v reflect.Value) {
 	for i := 0; i < v.Elem().NumField(); i++ {
-		if v.Elem().Field(i).Kind() == reflect.Ptr && v.Elem().Field(i).IsNil() {
+		if (v.Elem().Field(i).Kind() == reflect.Ptr || v.Elem().Field(i).Kind() == reflect.Interface) && v.Elem().Field(i).IsNil() {
 			ftype := reflect.TypeOf(v.Elem().Field(i).Interface())
-			if value, ok := gdi.typeToValues[ftype]; ok {
-				v.Elem().Field(i).Set(value)
+			if ftype == nil { //当为接口时ftype为空
+				for t, vTmp := range gdi.typeToValues {
+					if t.Implements(v.Elem().Field(i).Type()) {
+						v.Elem().Field(i).Set(vTmp)
+						break
+					}
+				}
 			} else {
-				panic(fmt.Sprintf("inject type %v error,not found", ftype))
+				if value, ok := gdi.typeToValues[ftype]; ok {
+					v.Elem().Field(i).Set(value)
+				} else {
+					panic(fmt.Sprintf("inject type %v error,not found", ftype))
+				}
 			}
+
 		}
+
 	}
 }
 
