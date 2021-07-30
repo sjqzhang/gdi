@@ -40,6 +40,10 @@ func Get(t interface{})  (value interface{}, ok bool) {
 	return globalGDI.Get(t)
 }
 
+func Build()  {
+	globalGDI.Build()
+}
+
 func (gdi *GDIPool) RegisterObject(funcObjOrPtr interface{}) {
 	ftype := reflect.TypeOf(funcObjOrPtr)
 	if ftype.Kind() == reflect.Ptr {
