@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-var GDI *GDIPool
+var globalGDI *GDIPool
 
 type GDIPool struct {
 	creator       map[reflect.Type]interface{}
@@ -17,7 +17,7 @@ type GDIPool struct {
 }
 
 func init() {
-	GDI = newGDIPool()
+	globalGDI = newGDIPool()
 }
 
 func newGDIPool() *GDIPool {
@@ -28,6 +28,16 @@ func newGDIPool() *GDIPool {
 		typeToValues:  make(map[reflect.Type]reflect.Value),
 		ttvLocker:     sync.RWMutex{},
 	}
+}
+
+func RegisterObject(funcObjOrPtr interface{})  {
+
+	globalGDI.RegisterObject(funcObjOrPtr)
+
+}
+
+func Get(t interface{})  (value interface{}, ok bool) {
+	return globalGDI.Get(t)
 }
 
 func (gdi *GDIPool) RegisterObject(funcObjOrPtr interface{}) {
