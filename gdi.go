@@ -12,8 +12,8 @@ var globalGDI *GDIPool
 type GDIPool struct {
 	creator       map[reflect.Type]interface{}
 	creatorLocker sync.RWMutex
-	typeToValues map[reflect.Type]reflect.Value
-	ttvLocker    sync.RWMutex
+	typeToValues  map[reflect.Type]reflect.Value
+	ttvLocker     sync.RWMutex
 }
 
 func init() {
@@ -30,27 +30,30 @@ func newGDIPool() *GDIPool {
 	}
 }
 
-func RegisterObject(funcObjOrPtr interface{})  {
+func RegisterObject(funcObjOrPtr interface{}) {
 
 	globalGDI.RegisterObject(funcObjOrPtr)
 
 }
 
-func Get(t interface{})  (value interface{}, ok bool) {
-	return globalGDI.Get(t)
+func Get(t interface{}) (value interface{}) {
+	v, ok := globalGDI.Get(t)
+	if !ok {
+		return nil
+	}
+	return v
 }
 
-func Build()  {
+func Build() {
 	globalGDI.Build()
 }
 
 func (gdi *GDIPool) RegisterObject(funcObjOrPtr interface{}) {
 	ftype := reflect.TypeOf(funcObjOrPtr)
-	if ftype.Kind() == reflect.Ptr {
-		if _, ok := gdi.get(ftype); ok {
-			panic(fmt.Sprintf("object %v is multiple registration", funcObjOrPtr))
-		}
-		gdi.bind(ftype, funcObjOrPtr)
+	if ftype.Kind() == reflect.Ptr { // 对指针对象做特殊处理
+		gdi.ttvLocker.Lock()
+		defer gdi.ttvLocker.Unlock()
+		gdi.typeToValues[ftype] = reflect.ValueOf(funcObjOrPtr)
 		return
 	}
 	ftype, err := parsePoolFunc(funcObjOrPtr)
@@ -155,7 +158,9 @@ func (gdi *GDIPool) bind(outType reflect.Type, f interface{}) {
 
 	gdi.ttvLocker.Lock()
 	defer gdi.ttvLocker.Unlock()
-	gdi.typeToValues[outType] = create(f)
+	if f != nil {
+		gdi.typeToValues[outType] = create(f)
+	}
 }
 
 func (gdi *GDIPool) allType() (list []reflect.Type) {

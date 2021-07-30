@@ -6,9 +6,12 @@
 - 注册对象必须写在init方法中
 - 对象的类型必须是指针类型
 - 最后一定要调用 gdi.Build() 方法
+- 只支持单例实例，且只按类型进行反射注入
+- 只能能过指针参数获取对象
+- 需要注入的对象必须是导出属性（大写字母开头）
 
 ## 如何安装
-`go get 
+`go get -u github.com/sjqzhang/gdi`
 
 ## 使用示例
 ```golang
@@ -20,49 +23,58 @@ import (
 )
 
 type AA struct {
-
 	B *BB
-
 }
 
 type BB struct {
+	H *DD
 	C *CC
 }
 
 type CC struct {
 	Name string
-	Age int
+	Age  int
 }
 
-func init()  {
+type DD struct {
+	C *CC
+}
 
-	gdi.RegisterObject(func() *AA {
-		return &AA{
+func (d *DD) Say(hi string) string  {
 
+	fmt.Println(hi+ ", welcome")
+
+	return hi
+
+}
+
+func init() {
+
+	gdi.RegisterObject(&AA{})//简单对象
+	gdi.RegisterObject(&BB{})
+	gdi.RegisterObject(&DD{})
+
+	gdi.RegisterObject(func() *CC {//复杂对象
+
+		age:= func() int { //可进行复杂构造，这只是示例
+			return 10+4
 		}
-	})
-
-	gdi.RegisterObject(func() *BB {
-		return &BB {
-
-		}
-	})
-
-	gdi.RegisterObject(func() *CC {
-		return &CC {
+		return &CC{
 			Name: "hello world",
+			Age:  age(),
 		}
 	})
 }
-
-
 
 func main() {
-
-
-	a,_:=gdi.Get(&AA{})
 	gdi.Build()
-	fmt.Println(a.(*AA).B.C.Name)
+	var a *AA
+	if v := gdi.Get(a); v != nil {
+		a = v.(*AA)
+	}
+	fmt.Println(a.B.C.Name)
+	fmt.Println(a.B.H.C.Age)
+	fmt.Println(a.B.H.Say("zhangsan"))
 
 }
 
