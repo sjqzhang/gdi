@@ -17,10 +17,10 @@ type GDIPool struct {
 }
 
 func init() {
-	globalGDI = newGDIPool()
+	globalGDI = NewGDIPool()
 }
 
-func newGDIPool() *GDIPool {
+func NewGDIPool() *GDIPool {
 
 	return &GDIPool{
 		creator:       make(map[reflect.Type]interface{}),

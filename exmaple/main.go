@@ -1,5 +1,6 @@
 package main
 
+import "C"
 import (
 	"fmt"
 	"github.com/sjqzhang/gdi"
@@ -10,7 +11,7 @@ type AA struct {
 }
 
 type BB struct {
-	H *DD
+	D *DD
 	C *CC
 }
 
@@ -91,10 +92,10 @@ func main() {
 	var a *AA
 	a = gdi.Get(a).(*AA) //说明，这里可以直接进行类型转换，不会出现空指针，当出现空指针时，gdi.Build()就会panic
 	fmt.Println(a.B.C.Name)
-	fmt.Println(a.B.H.C.Age)
-	fmt.Println(a.B.H.Say("zhangsan"))
+	fmt.Println(a.B.D.C.Age)
+	fmt.Println(a.B.D.Say("zhangsan"))
 
-	fmt.Println(a.B.H.I.Add(2, 3))
-	fmt.Println(a.B.H.E.A.B.H.E.A.B.H.E.A.B.C.Age)
+	fmt.Println(a.B.D.I.Add(2, 3))
+	fmt.Println(a.B.D.E.A.B.D.E.A.B.D.E.A.B.C.Age)
 
 }
