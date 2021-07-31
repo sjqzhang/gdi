@@ -22,7 +22,7 @@ func TestAll(t *testing.T) {
 
 
 	name:="gdi"
-	gp:=newGDIPool()
+	gp:=NewGDIPool()
 	gp.RegisterObject(&gdiTest{
 		Name: name,
 	}, func() *gdiTest2 {
