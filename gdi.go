@@ -37,11 +37,7 @@ func RegisterObject(funcObjOrPtrs ...interface{}) {
 }
 
 func Get(t interface{}) (value interface{}) {
-	v, ok := globalGDI.Get(t)
-	if !ok {
-		return nil
-	}
-	return v
+	return globalGDI.Get(t)
 }
 
 func Build() {
@@ -68,19 +64,8 @@ func (gdi *GDIPool) RegisterObject(funcObjOrPtrs ...interface{}) {
 }
 
 func (gdi *GDIPool) Build() *GDIPool {
-	gdi.ttvLocker.Lock()
-	defer gdi.ttvLocker.Unlock()
-	for k, v := range gdi.typeToValues {
-		if v.Kind() == reflect.Ptr && v.IsNil() {
-			obj, ok := gdi.getOrCreate(k)
-			gdi.build(v)
-			if !ok {
-				panic(fmt.Sprintf("inject %v error", k.Kind()))
-			}
-			gdi.typeToValues[k] = obj
-		} else {
-			gdi.build(v)
-		}
+	for _, v := range gdi.typeToValues {
+		gdi.build(v)
 	}
 	return gdi
 }
@@ -114,12 +99,13 @@ func (gdi *GDIPool) build(v reflect.Value) {
 	}
 }
 
-func (gdi *GDIPool) Get(t interface{}) (value interface{}, ok bool) {
+func (gdi *GDIPool) Get(t interface{}) (value interface{}) {
 	ftype := reflect.TypeOf(t)
-	result, o := gdi.get(ftype)
-	value = result.Interface()
-	ok = o
-	return
+	result, ok := gdi.get(ftype)
+	if !ok {
+		return nil
+	}
+	return result.Interface()
 
 }
 
@@ -130,34 +116,6 @@ func (gdi *GDIPool) get(t reflect.Type) (result reflect.Value, ok bool) {
 	return
 }
 
-func (gdi *GDIPool) getFunc(t reflect.Type) (fun interface{}, ok bool) {
-	gdi.creatorLocker.RLock()
-	defer gdi.creatorLocker.RUnlock()
-	fun, ok = gdi.creator[t]
-	return
-}
-
-// get .
-func (gdi *GDIPool) getOrCreate(t reflect.Type) (result reflect.Value, ok bool) {
-	result, ok = gdi.get(t)
-	if ok {
-		return
-	}
-
-	fun, ok := gdi.getFunc(t)
-	// 没有找到对应的方法不进行create
-	if !ok {
-		return
-	}
-
-	gdi.set(t, create(fun))
-
-	//gdi.ttvLocker.Lock()
-	//defer gdi.ttvLocker.Unlock()
-	//gdi.typeToValues[t] = create(fun)
-
-	return
-}
 
 func create(fun interface{}) reflect.Value {
 	values := reflect.ValueOf(fun).Call([]reflect.Value{})
@@ -207,34 +165,6 @@ func (gdi *GDIPool) bind(outType reflect.Type, f interface{}) {
 
 }
 
-func (gdi *GDIPool) allType() (list []reflect.Type) {
-	gdi.ttvLocker.RLock()
-	defer gdi.ttvLocker.RUnlock()
-
-	for t := range gdi.typeToValues {
-		list = append(list, t)
-	}
-	return
-}
-
-func (gdi *GDIPool) di(dest interface{}, call func(reflect.Value)) {
-	allFields(dest, call)
-}
-
-func fetchValue(dest, src interface{}) bool {
-	value := reflect.ValueOf(dest)
-	if value.Kind() != reflect.Ptr {
-		return false
-	}
-	value = value.Elem()
-	srvValue := reflect.ValueOf(src)
-	if value.Type() == srvValue.Type() {
-		value.Set(srvValue)
-		return true
-	}
-	return false
-}
-
 func parsePoolFunc(f interface{}) (outType reflect.Type, e error) {
 	ftype := reflect.TypeOf(f)
 	if ftype.Kind() != reflect.Func {
@@ -252,38 +182,4 @@ func parsePoolFunc(f interface{}) (outType reflect.Type, e error) {
 		return
 	}
 	return
-}
-
-// allFields
-func allFields(dest interface{}, call func(reflect.Value)) {
-	destVal := indirect(reflect.ValueOf(dest))
-	destType := destVal.Type()
-	if destType.Kind() != reflect.Struct && destType.Kind() != reflect.Interface {
-		return
-	}
-
-	for index := 0; index < destVal.NumField(); index++ {
-		val := destVal.Field(index)
-		call(val)
-	}
-}
-
-// allFieldsFromValue
-func allFieldsFromValue(val reflect.Value, call func(reflect.Value)) {
-	destVal := indirect(val)
-	destType := destVal.Type()
-	if destType.Kind() != reflect.Struct && destType.Kind() != reflect.Interface {
-		return
-	}
-	for index := 0; index < destVal.NumField(); index++ {
-		val := destVal.Field(index)
-		call(val)
-	}
-}
-
-func indirect(reflectValue reflect.Value) reflect.Value {
-	for reflectValue.Kind() == reflect.Ptr || reflectValue.Kind() == reflect.Interface {
-		reflectValue = reflectValue.Elem()
-	}
-	return reflectValue
 }
