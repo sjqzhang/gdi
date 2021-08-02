@@ -1,6 +1,5 @@
 package main
 
-import "C"
 import (
 	"fmt"
 	"github.com/sjqzhang/gdi"
@@ -97,7 +96,7 @@ func init() {
 }
 
 func main() {
-	//gdi.Debug(true)
+	gdi.Debug(true)
 	gdi.Init() //使用前必须先调用，当出现无解注入对象时会panic,避免运行时出现空指针
 	var a *AA
 	a = gdi.Get(a).(*AA) //说明，这里可以直接进行类型转换，不会出现空指针，当出现空指针时，gdi.Init()就会panic

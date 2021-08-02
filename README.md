@@ -18,7 +18,6 @@
 ```golang
 package main
 
-import "C"
 import (
 	"fmt"
 	"github.com/sjqzhang/gdi"
@@ -46,6 +45,12 @@ type DD struct {
 
 type EE struct {
 	A *AA
+	*FF
+}
+
+type FF struct {
+
+	Addr string
 }
 
 type IIer interface {
@@ -86,6 +91,9 @@ func init() {
 	//gdi.RegisterObject(&DD{})
 	//gdi.RegisterObject(&CC{})
 	gdi.RegisterObject(&II{}) //简单对象
+	gdi.RegisterObject(&FF{
+		Addr: "SZ",
+	}) //简单对象
 
 	gdi.RegisterObject(func() *CC { //复杂对象
 
@@ -98,10 +106,10 @@ func init() {
 		}
 	})
 
-	//gdi.RegisterObject(func() (*EE, error) { //带错误的注册
-	//
-	//	return &EE{}, nil
-	//})
+	gdi.RegisterObject(func() (*EE, error) { //带错误的注册
+
+		return &EE{}, nil
+	})
 
 }
 
@@ -116,8 +124,8 @@ func main() {
 
 	fmt.Println(a.B.D.I.Add(2, 3))
 	fmt.Println(a.B.D.E.A.B.D.E.A.B.D.E.A.B.C.Age)
+	fmt.Println(a.B.D.E.Addr)
 
 }
-
 
 ```
