@@ -28,6 +28,12 @@ type DD struct {
 
 type EE struct {
 	A *AA
+	 *FF
+}
+
+type FF struct {
+
+	Addr string
 }
 
 type IIer interface {
@@ -68,6 +74,9 @@ func init() {
 	//gdi.RegisterObject(&DD{})
 	//gdi.RegisterObject(&CC{})
 	gdi.RegisterObject(&II{}) //简单对象
+	gdi.RegisterObject(&FF{
+		Addr: "SZ",
+	}) //简单对象
 
 	gdi.RegisterObject(func() *CC { //复杂对象
 
@@ -80,23 +89,24 @@ func init() {
 		}
 	})
 
-	//gdi.RegisterObject(func() (*EE, error) { //带错误的注册
-	//
-	//	return &EE{}, nil
-	//})
+	gdi.RegisterObject(func() (*EE, error) { //带错误的注册
+
+		return &EE{}, nil
+	})
 
 }
 
 func main() {
-	gdi.Debug(true)
-	gdi.Build() //使用前必须先调用，当出现无解注入对象时会panic,避免运行时出现空指针
+	//gdi.Debug(true)
+	gdi.Init() //使用前必须先调用，当出现无解注入对象时会panic,避免运行时出现空指针
 	var a *AA
-	a = gdi.Get(a).(*AA) //说明，这里可以直接进行类型转换，不会出现空指针，当出现空指针时，gdi.Build()就会panic
+	a = gdi.Get(a).(*AA) //说明，这里可以直接进行类型转换，不会出现空指针，当出现空指针时，gdi.Init()就会panic
 	fmt.Println(a.B.C.Name)
 	fmt.Println(a.B.D.C.Age)
 	fmt.Println(a.B.D.Say("zhangsan"))
 
 	fmt.Println(a.B.D.I.Add(2, 3))
 	fmt.Println(a.B.D.E.A.B.D.E.A.B.D.E.A.B.C.Age)
+	fmt.Println(a.B.D.E.Addr)
 
 }

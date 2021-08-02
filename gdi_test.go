@@ -4,6 +4,7 @@ import "testing"
 
 type gdiTest struct {
 	Name string
+	f *string
 }
 type gdiTest2 struct {
 	Name string
@@ -30,7 +31,7 @@ func TestAll(t *testing.T) {
 			Name:name,
 		}
 	})
-	gp.Build()
+	gp.Init()
 	var g *gdiTest
 	var g2 *gdiTest2
 	if gp.Get(g).(*gdiTest).Name!=name {
@@ -59,7 +60,7 @@ func TestAll2(t *testing.T) {
 			Name:name,
 		}
 	})
-	Build()
+	Init()
 	var g *gdiTest
 	var g2 *gdiTest2
 	if Get(g).(*gdiTest).Name!=name {
