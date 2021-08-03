@@ -12,6 +12,7 @@ var globalGDI *GDIPool
 
 type GDIPool struct {
 	debug         bool
+	autoCreate    bool
 	creator       map[reflect.Type]interface{}
 	creatorLocker sync.RWMutex
 	typeToValues  map[reflect.Type]reflect.Value
@@ -26,6 +27,7 @@ func NewGDIPool() *GDIPool {
 
 	return &GDIPool{
 		debug:         false,
+		autoCreate: false,
 		creator:       make(map[reflect.Type]interface{}),
 		creatorLocker: sync.RWMutex{},
 		typeToValues:  make(map[reflect.Type]reflect.Value),
@@ -39,12 +41,20 @@ func RegisterObject(funcObjOrPtrs ...interface{}) {
 
 }
 
+func AutoCreate(autoCreate bool)  {
+	globalGDI.AutoCreate(autoCreate)
+}
+
 func Get(t interface{}) (value interface{}) {
 	return globalGDI.Get(t)
 }
 
 func Init() {
 	globalGDI.Init()
+}
+
+func (gdi *GDIPool)AutoCreate(autoCreate bool)  {
+	gdi.autoCreate=autoCreate
 }
 
 func (gdi *GDIPool) RegisterObject(funcObjOrPtrs ...interface{}) {
@@ -105,7 +115,16 @@ func (gdi *GDIPool) build(v reflect.Value) {
 					v.Elem().Field(i).Set(value)
 					gdi.log(fmt.Sprintf("pointer %v injected by %v success", v.Elem().Field(i).Type(), ftype))
 				} else {
-					gdi.panic(fmt.Sprintf("inject type %v not found,please Register first!!!!", ftype))
+					if gdi.autoCreate {
+						//TODO 不知道怎么通过指针获取类型反射动态创建对象
+						//fmt.Println(reflect.ValueOf( ftype.Elem()).Type())
+						//value=reflect.New(ftype)
+						//v.Elem().Field(i).Set( value)
+						//gdi.set(ftype,value)
+						gdi.log(fmt.Sprintf("pointer %v injected by auto create %v success", v.Elem().Field(i).Type(), ftype))
+					} else {
+						gdi.panic(fmt.Sprintf("inject type %v not found,please Register first!!!!", ftype))
+					}
 				}
 			}
 		} else if !v.Elem().Field(i).CanSet() && (v.Elem().Field(i).Kind() == reflect.Ptr || v.Elem().Field(i).Kind() == reflect.Interface) {
