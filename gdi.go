@@ -27,7 +27,7 @@ func NewGDIPool() *GDIPool {
 
 	return &GDIPool{
 		debug:         false,
-		autoCreate: false,
+		autoCreate:    false,
 		creator:       make(map[reflect.Type]interface{}),
 		creatorLocker: sync.RWMutex{},
 		typeToValues:  make(map[reflect.Type]reflect.Value),
@@ -41,7 +41,7 @@ func RegisterObject(funcObjOrPtrs ...interface{}) {
 
 }
 
-func AutoCreate(autoCreate bool)  {
+func AutoCreate(autoCreate bool) {
 	globalGDI.AutoCreate(autoCreate)
 }
 
@@ -53,8 +53,8 @@ func Init() {
 	globalGDI.Init()
 }
 
-func (gdi *GDIPool)AutoCreate(autoCreate bool)  {
-	gdi.autoCreate=autoCreate
+func (gdi *GDIPool) AutoCreate(autoCreate bool) {
+	gdi.autoCreate = autoCreate
 }
 
 func (gdi *GDIPool) RegisterObject(funcObjOrPtrs ...interface{}) {
@@ -116,11 +116,10 @@ func (gdi *GDIPool) build(v reflect.Value) {
 					gdi.log(fmt.Sprintf("pointer %v injected by %v success", v.Elem().Field(i).Type(), ftype))
 				} else {
 					if gdi.autoCreate {
-						//TODO 不知道怎么通过指针获取类型反射动态创建对象
-						//fmt.Println(reflect.ValueOf( ftype.Elem()).Type())
-						//value=reflect.New(ftype)
-						//v.Elem().Field(i).Set( value)
-						//gdi.set(ftype,value)
+						value = reflect.New(ftype.Elem())
+						v.Elem().Field(i).Set(value)
+						gdi.set(ftype, value.Interface()) //must understand the reflect type and reflect value and interface{} relation
+						gdi.build(value)
 						gdi.log(fmt.Sprintf("pointer %v injected by auto create %v success", v.Elem().Field(i).Type(), ftype))
 					} else {
 						gdi.panic(fmt.Sprintf("inject type %v not found,please Register first!!!!", ftype))
@@ -203,8 +202,9 @@ func (gdi *GDIPool) set(outType reflect.Type, f interface{}) {
 			gdi.log(fmt.Sprintf("inject %v success", outType))
 		} else if reflect.TypeOf(f).Kind() == reflect.Ptr {
 			gdi.typeToValues[outType] = reflect.ValueOf(f)
-			gdi.log(fmt.Sprintf("inject %v success", outType))
+			//gdi.log(fmt.Sprintf("inject %v success", outType))
 		} else {
+			//gdi.typeToValues[outType] = reflect.ValueOf(f)
 			gdi.panic(fmt.Sprintf("%v type not support ", reflect.TypeOf(f)))
 		}
 	}

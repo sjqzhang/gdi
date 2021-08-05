@@ -27,11 +27,10 @@ type DD struct {
 
 type EE struct {
 	A *AA
-	 *FF
+	*FF
 }
 
 type FF struct {
-
 	Addr string
 }
 
@@ -96,9 +95,9 @@ func init() {
 }
 
 func main() {
-	gdi.Debug(true)
-	gdi.AutoCreate(true)
-	gdi.Init() //使用前必须先调用，当出现无解注入对象时会panic,避免运行时出现空指针
+	gdi.Debug(true)      //显示注入信息，方便排错，需在gdi.Init()方法之前调用
+	gdi.AutoCreate(true) //开启自动注入
+	gdi.Init()           //使用前必须先调用，当出现无解注入对象时会panic,避免运行时出现空指针
 	var a *AA
 	a = gdi.Get(a).(*AA) //说明，这里可以直接进行类型转换，不会出现空指针，当出现空指针时，gdi.Init()就会panic
 	fmt.Println(a.B.C.Name)
@@ -107,6 +106,7 @@ func main() {
 
 	fmt.Println(a.B.D.I.Add(2, 3))
 	fmt.Println(a.B.D.E.A.B.D.E.A.B.D.E.A.B.C.Age)
+	fmt.Println(a.B.D.E.A.B.C.Name)
 	fmt.Println(a.B.D.E.Addr)
 
 }
