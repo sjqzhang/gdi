@@ -61,10 +61,15 @@ func (gdi *GDIPool) RegisterObject(funcObjOrPtrs ...interface{}) {
 	for i, _ := range funcObjOrPtrs {
 		funcObjOrPtr := funcObjOrPtrs[i]
 		ftype := reflect.TypeOf(funcObjOrPtr)
-		if _, ok := gdi.get(ftype); ok {
-			gdi.panic(fmt.Sprintf("double register %v", ftype))
+		if ftype.Kind()!=reflect.Ptr && ftype.Kind()!= reflect.Func  {
+			gdi.warn(fmt.Sprintf("(WARNNING) register %v fail just support a struct pointer or a function return a struct pointer ",ftype))
+			return
 		}
-		if ftype.Kind() == reflect.Ptr { // 对指针对象做特殊处理
+		if _, ok := gdi.get(ftype); ok {
+			//gdi.panic(fmt.Sprintf("double register %v", ftype))
+			return
+		}
+		if ftype.Kind() == reflect.Ptr && ftype.Elem().Kind()==reflect.Struct { // 对指针对象做特殊处理
 			gdi.set(ftype, funcObjOrPtr)
 			continue
 		}
@@ -102,7 +107,7 @@ func (gdi *GDIPool) build(v reflect.Value) {
 				for t, vTmp := range gdi.all() {
 					if t.Implements(v.Elem().Field(i).Type()) {
 						v.Elem().Field(i).Set(vTmp)
-						gdi.log(fmt.Sprintf("interface %v injected by %v success", v.Elem().Field(i).Type(), t))
+						gdi.log(fmt.Sprintf("interface %v injected by %v success %v", v.Elem().Field(i).Type(), t,v.Type()))
 						isExist = true
 						break
 					}
@@ -111,9 +116,14 @@ func (gdi *GDIPool) build(v reflect.Value) {
 					gdi.panic(fmt.Sprintf("inject type %v not found,please Register first!!!!", v.Elem().Field(i).Type()))
 				}
 			} else {
+				if ftype.Elem().Kind()!=reflect.Struct {
+					gdi.warn(fmt.Sprintf("(WARNNING) inject %v ignore of %v,type just support Struct ",ftype,v.Type()))
+					continue
+
+				}
 				if value, ok := gdi.get(ftype); ok {
 					v.Elem().Field(i).Set(value)
-					gdi.log(fmt.Sprintf("pointer %v injected by %v success", v.Elem().Field(i).Type(), ftype))
+					gdi.log(fmt.Sprintf("pointer %v injected by %v success %v", v.Elem().Field(i).Type(), ftype,v.Type()))
 				} else {
 					if gdi.autoCreate {
 						value = reflect.New(ftype.Elem())
@@ -187,7 +197,8 @@ func (gdi *GDIPool) create(fun interface{}) reflect.Value {
 
 func (gdi *GDIPool) set(outType reflect.Type, f interface{}) {
 	if _, ok := gdi.get(outType); ok {
-		gdi.panic(fmt.Sprintf("double register %v", outType))
+		//gdi.panic(fmt.Sprintf("double register %v", outType))
+		return
 	}
 	gdi.creatorLocker.Lock()
 	defer gdi.creatorLocker.Unlock()
@@ -213,7 +224,11 @@ func (gdi *GDIPool) set(outType reflect.Type, f interface{}) {
 func (gdi *GDIPool) parsePoolFunc(f interface{}) (outType reflect.Type, e error) {
 	ftype := reflect.TypeOf(f)
 	if ftype.Kind() != reflect.Func {
-		e = errors.New("it's not a func")
+		e = errors.New(fmt.Sprintf("%v it's not a func",f))
+		return
+	}
+	if  ftype.NumOut()==0 {
+		e = errors.New(fmt.Sprintf("%v return values should be a pointer",f))
 		return
 	}
 	if ftype.NumOut() > 2 {
@@ -227,3 +242,8 @@ func (gdi *GDIPool) parsePoolFunc(f interface{}) (outType reflect.Type, e error)
 	}
 	return
 }
+
+
+
+
+
