@@ -66,7 +66,7 @@ func (gdi *GDIPool) RegisterObject(funcObjOrPtrs ...interface{}) {
 			return
 		}
 		if _, ok := gdi.get(ftype); ok {
-			//gdi.panic(fmt.Sprintf("double register %v", ftype))
+			gdi.panic(fmt.Sprintf("double register %v", ftype))
 			return
 		}
 		if ftype.Kind() == reflect.Ptr && ftype.Elem().Kind()==reflect.Struct { // 对指针对象做特殊处理
@@ -197,7 +197,7 @@ func (gdi *GDIPool) create(fun interface{}) reflect.Value {
 
 func (gdi *GDIPool) set(outType reflect.Type, f interface{}) {
 	if _, ok := gdi.get(outType); ok {
-		//gdi.panic(fmt.Sprintf("double register %v", outType))
+		gdi.panic(fmt.Sprintf("double register %v", outType))
 		return
 	}
 	gdi.creatorLocker.Lock()
