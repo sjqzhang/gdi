@@ -33,6 +33,7 @@ type EE struct {
 
 type FF struct {
 	Addr string
+	T *TT `inject:"name:ttt"`
 }
 
 type TT struct {
@@ -119,7 +120,7 @@ func main() {
 	fmt.Println(a.B.D.I.Add(2, 3))
 	fmt.Println(a.B.D.E.A.B.D.E.A.B.D.E.A.B.C.Age)
 	fmt.Println(a.B.D.E.A.B.C.Name)
-	fmt.Println(a.B.D.E.Addr)
+	fmt.Println(a.B.D.E.T.Hl)
 	//tl.Typelinks()
 
 	gdi.RegisterObject()
