@@ -16,6 +16,7 @@ type GDIPool struct {
 	creator       map[reflect.Type]interface{}
 	creatorLocker sync.RWMutex
 	typeToValues  map[reflect.Type]reflect.Value
+	namesToValues  map[string]reflect.Value
 	ttvLocker     sync.RWMutex
 }
 
@@ -31,6 +32,7 @@ func NewGDIPool() *GDIPool {
 		creator:       make(map[reflect.Type]interface{}),
 		creatorLocker: sync.RWMutex{},
 		typeToValues:  make(map[reflect.Type]reflect.Value),
+		namesToValues:  make(map[string]reflect.Value),
 		ttvLocker:     sync.RWMutex{},
 	}
 }
@@ -123,6 +125,9 @@ func (gdi *GDIPool) build(v reflect.Value) {
 				}
 				if value, ok := gdi.get(ftype); ok {
 					v.Elem().Field(i).Set(value)
+
+					tag:=reflect.TypeOf(v.Elem().Interface()).Field(i).Tag
+					fmt.Println(tag.Lookup("inject"))
 					gdi.log(fmt.Sprintf("pointer %v injected by %v success %v", v.Elem().Field(i).Type(), ftype,v.Type()))
 				} else {
 					if gdi.autoCreate {
@@ -181,18 +186,23 @@ func (gdi *GDIPool) panic(msg string) {
 	log.Fatal(msg)
 }
 
-func (gdi *GDIPool) create(fun interface{}) reflect.Value {
+func (gdi *GDIPool) create(fun interface{}) ( []reflect.Value ) {
 	values := reflect.ValueOf(fun).Call([]reflect.Value{})
 	if len(values) == 0 {
 		gdi.panic(fmt.Sprintf("Dependency injector: func return value must be a pointer or a pointer with error, %v", reflect.TypeOf(fun)))
+
 	}
 	if len(values) > 2 {
 		gdi.panic(fmt.Sprintf("Dependency injector: func return value must be a pointer or a pointer with error, %v", reflect.TypeOf(fun)))
 	}
-	if len(values) == 2 && values[1].Interface() != nil {
+
+	if len(values) == 2 && values[1].Interface()!=nil && reflect.TypeOf( values[1].Interface()).Kind()==reflect.Ptr  {
 		gdi.panic(fmt.Sprintf("init %v throw %v", reflect.TypeOf(fun), reflect.ValueOf(values[1]).Interface()))
 	}
-	return values[0]
+	//if len(values) == 2 && values[1].Interface()!=nil  && reflect.TypeOf( values[1].Interface()).Kind()==reflect.String {
+	//	gdi.panic(fmt.Sprintf("init %v throw %v", reflect.TypeOf(fun), reflect.ValueOf(values[1]).Interface()))
+	//}
+	return values
 }
 
 func (gdi *GDIPool) set(outType reflect.Type, f interface{}) {
@@ -209,7 +219,12 @@ func (gdi *GDIPool) set(outType reflect.Type, f interface{}) {
 	defer gdi.ttvLocker.Unlock()
 	if f != nil {
 		if reflect.TypeOf(f).Kind() == reflect.Func {
-			gdi.typeToValues[outType] = gdi.create(f)
+			vals:=gdi.create(f)
+			if len(vals)==1 {
+				gdi.typeToValues[outType] = vals[0]
+			} else if len(vals)==2 && vals[1].Kind()==reflect.String {
+				gdi.namesToValues[vals[1].Interface().(string)] = vals[0]
+			}
 			gdi.log(fmt.Sprintf("inject %v success", outType))
 		} else if reflect.TypeOf(f).Kind() == reflect.Ptr {
 			gdi.typeToValues[outType] = reflect.ValueOf(f)

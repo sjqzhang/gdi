@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/sjqzhang/gdi"
+	//"github.com/sjqzhang/gdi/tl"
 )
 
 type AA struct {
@@ -26,12 +27,16 @@ type DD struct {
 }
 
 type EE struct {
-	A *AA
-	*FF
+	A *AA `inject:"name:a" json:"a"`
+	*FF 
 }
 
 type FF struct {
 	Addr string
+}
+
+type TT struct {
+	Hl string
 }
 
 type IIer interface {
@@ -87,10 +92,17 @@ func init() {
 		}
 	})
 
-	//gdi.RegisterObject(func() (*EE, error) { //带错误的注册
-	//
-	//	return &EE{}, nil
-	//})
+	gdi.RegisterObject(func() (*EE, error) { //带错误的注册
+
+		return &EE{}, nil
+	})
+
+	gdi.RegisterObject(func() (*TT,string) {
+
+		return &TT{
+			Hl: "aaaa",
+		},"ttt"
+	})
 
 }
 
@@ -108,5 +120,8 @@ func main() {
 	fmt.Println(a.B.D.E.A.B.D.E.A.B.D.E.A.B.C.Age)
 	fmt.Println(a.B.D.E.A.B.C.Name)
 	fmt.Println(a.B.D.E.Addr)
+	//tl.Typelinks()
+
+	gdi.RegisterObject()
 
 }
