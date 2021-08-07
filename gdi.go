@@ -108,6 +108,14 @@ func (gdi *GDIPool) build(v reflect.Value) {
 			fieldName:=reflect.TypeOf(v.Elem().Interface()).Field(i).Name
 			fieldType:=reflect.TypeOf(v.Elem().Interface()).Field(i).Type
 			if ftype == nil { //当为接口时ftype为空
+				name,ok:=gdi.getTagAttr(reflect.TypeOf(v.Elem().Interface()).Field(i),"name")
+				if ok {
+					if value,ok:=gdi.namesToValues[name];ok {
+						v.Elem().Field(i).Set(value)
+						gdi.log(fmt.Sprintf("inject by name the field %v of %v by %v",fieldName,v.Type(),fieldType))
+						continue
+					}
+				}
 				isExist := false
 				for t, vTmp := range gdi.all() {
 					if t.Implements(v.Elem().Field(i).Type()) {
@@ -121,14 +129,6 @@ func (gdi *GDIPool) build(v reflect.Value) {
 					gdi.panic(fmt.Sprintf("inject type %v not found,please Register first!!!!", v.Elem().Field(i).Type()))
 				}
 			} else {
-
-				if ftype.Elem().Kind() != reflect.Struct {
-					gdi.warn(fmt.Sprintf("(WARNNING) inject %v ignore of %v,type just support Struct ", ftype, v.Type()))
-					continue
-
-				}
-
-
 				name,ok:=gdi.getTagAttr(reflect.TypeOf(v.Elem().Interface()).Field(i),"name")
 				if ok {
 					if value,ok:=gdi.namesToValues[name];ok {
@@ -136,6 +136,11 @@ func (gdi *GDIPool) build(v reflect.Value) {
 						gdi.log(fmt.Sprintf("inject by name the field %v of %v by %v",fieldName,v.Type(),fieldType))
 						continue
 					}
+				}
+				if ftype.Elem().Kind() != reflect.Struct {
+					gdi.warn(fmt.Sprintf("(WARNNING) inject %v ignore of %v,type just support Struct ", ftype, v.Type()))
+					continue
+
 				}
 				if value, ok := gdi.get(ftype); ok {
 					v.Elem().Field(i).Set(value)

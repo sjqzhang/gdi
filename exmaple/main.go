@@ -8,6 +8,7 @@ import (
 
 type AA struct {
 	B *BB
+	A *string `inject:"name:hello"`
 }
 
 type BB struct {
@@ -22,7 +23,7 @@ type CC struct {
 
 type DD struct {
 	C *CC
-	I IIer //注意当为接口时，这里不能是指针，且有多实现时，目前只能返回第一个实现
+	I IIer `inject:"name:ii"` //注意当为接口时，这里不能是指针，且有多实现时，目前只能返回第一个实现
 	E *EE
 }
 
@@ -45,9 +46,11 @@ type IIer interface {
 }
 
 type II struct {
+	A *string `inject:"name:hello"`
 }
 
 func (ii *II) Add(a, b int) int {
+	fmt.Println("ii.a->",ii.A)
 	return a + b
 }
 
@@ -77,7 +80,11 @@ func init() {
 	//gdi.RegisterObject(&BB{})
 	//gdi.RegisterObject(&DD{})
 	//gdi.RegisterObject(&CC{})
-	gdi.RegisterObject(&II{}) //简单对象
+	gdi.RegisterObject(func() (*II,string){
+		return &II{
+
+		},"ii"
+	}) //简单对象
 	//gdi.RegisterObject(&FF{
 	//	Addr: "SZ",
 	//}) //简单对象
@@ -105,6 +112,13 @@ func init() {
 		},"ttt"
 	})
 
+	gdi.RegisterObject(func() (*string,string) {
+
+		var name string
+		name="xsdasdfaf"
+		return &name,"hello"
+	})
+
 }
 
 func main() {
@@ -122,7 +136,7 @@ func main() {
 	fmt.Println(a.B.D.E.A.B.C.Name)
 	fmt.Println(a.B.D.E.T.Hl)
 	//tl.Typelinks()
-
+	fmt.Println(*a.A)
 	gdi.RegisterObject()
 
 }
