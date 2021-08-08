@@ -186,6 +186,7 @@ func (gdi *GDIPool) Get(t interface{}) (value interface{}) {
 		result, ok = gdi.get(ftype)
 	}
 	if !ok {
+		gdi.warn(fmt.Sprintf("can't found %v,Is gdi.Init() called?",t))
 		return nil
 	}
 	return result.Interface()
