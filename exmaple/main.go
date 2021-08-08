@@ -70,26 +70,26 @@ func (d *DD) Add(a, b int) int { //注意：当有多个实现时，存在不确
 
 func init() {
 
-	gdi.RegisterObject(
+	gdi.Register(
 		&AA{},
 		&BB{},
 		func() *DD {
 			return &DD{}
 		},
 	) //可以一次注册多个对象
-	//gdi.RegisterObject(&BB{})
-	//gdi.RegisterObject(&DD{})
-	//gdi.RegisterObject(&CC{})
-	gdi.RegisterObject(func() (*II,string){
+	//gdi.Register(&BB{})
+	//gdi.Register(&DD{})
+	//gdi.Register(&CC{})
+	gdi.Register(func() (*II,string){
 		return &II{
 
 		},"ii"
 	}) //简单对象
-	//gdi.RegisterObject(&FF{
+	//gdi.Register(&FF{
 	//	Addr: "SZ",
 	//}) //简单对象
 
-	gdi.RegisterObject(func() *CC { //复杂对象
+	gdi.Register(func() *CC { //复杂对象
 
 		age := func() int { //可进行复杂构造，这只是示例
 			return 10 + 4
@@ -100,19 +100,19 @@ func init() {
 		}
 	})
 
-	gdi.RegisterObject(func() (*EE, error) { //带错误的注册
+	gdi.Register(func() (*EE, error) { //带错误的注册
 
 		return &EE{}, nil
 	})
 
-	gdi.RegisterObject(func() (*TT,string) {
+	gdi.Register(func() (*TT,string) {
 
 		return &TT{
 			Hl: "aaaa",
 		},"ttt"
 	})
 
-	gdi.RegisterObject(func() (*string,string) {
+	gdi.Register(func() (*string,string) {
 
 		var name string
 		name="xsdasdfaf"
@@ -137,6 +137,6 @@ func main() {
 	fmt.Println(a.B.D.E.T.Hl)
 	//tl.Typelinks()
 	fmt.Println(*a.A)
-	gdi.RegisterObject()
+	gdi.Register()
 
 }

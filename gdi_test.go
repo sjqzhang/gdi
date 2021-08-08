@@ -24,7 +24,7 @@ func TestAll(t *testing.T) {
 
 	name:="gdi"
 	gp:=NewGDIPool()
-	gp.RegisterObject(&gdiTest{
+	gp.Register(&gdiTest{
 		Name: name,
 	}, func() *gdiTest2 {
 		return &gdiTest2{
@@ -53,7 +53,7 @@ func TestAll2(t *testing.T) {
 
 	name:="gdi"
 
-	RegisterObject(&gdiTest{
+	Register(&gdiTest{
 		Name: name,
 	}, func() *gdiTest2 {
 		return &gdiTest2{
