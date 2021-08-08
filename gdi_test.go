@@ -8,6 +8,7 @@ type gdiTest struct {
 }
 type gdiTest2 struct {
 	Name string
+	Name2 *string `inject:"name:test"`
 	I igdiTest
 }
 type igdiTest interface {
@@ -30,6 +31,10 @@ func TestAll(t *testing.T) {
 		return &gdiTest2{
 			Name:name,
 		}
+	}, func()(*string,string) {
+		var name string
+		name="jqzhang"
+		return &name,"test"
 	})
 	gp.Init()
 	var g *gdiTest
@@ -43,6 +48,11 @@ func TestAll(t *testing.T) {
 	if gp.Get(g2).(*gdiTest2).I.Add(1,2)!=3 {
 		t.Fail()
 	}
+
+	if *gp.Get(g2).(*gdiTest2).Name2!="jqzhang"{
+		t.Fail()
+	}
+
 
 
 }
@@ -59,6 +69,10 @@ func TestAll2(t *testing.T) {
 		return &gdiTest2{
 			Name:name,
 		}
+	},func()(*string,string) {
+		var name string
+		name="jqzhang"
+		return &name,"test"
 	})
 	Init()
 	var g *gdiTest
@@ -72,6 +86,8 @@ func TestAll2(t *testing.T) {
 	if Get(g2).(*gdiTest2).I.Add(1,2)!=3 {
 		t.Fail()
 	}
-
+	if *Get(g2).(*gdiTest2).Name2!="jqzhang"{
+		t.Fail()
+	}
 
 }
