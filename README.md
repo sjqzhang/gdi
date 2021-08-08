@@ -21,10 +21,12 @@ package main
 import (
 	"fmt"
 	"github.com/sjqzhang/gdi"
+	//"github.com/sjqzhang/gdi/tl"
 )
 
 type AA struct {
 	B *BB
+	A *string `inject:"name:hello"`
 }
 
 type BB struct {
@@ -39,18 +41,22 @@ type CC struct {
 
 type DD struct {
 	C *CC
-	I IIer //注意当为接口时，这里不能是指针，且有多实现时，目前只能返回第一个实现
+	I IIer `inject:"name:ii"` //注意当为接口时，这里不能是指针，且有多实现时，目前只能返回第一个实现
 	E *EE
 }
 
 type EE struct {
-	A *AA
+	A *AA `inject:"name:a" json:"a"`
 	*FF
 }
 
 type FF struct {
-
 	Addr string
+	T *TT `inject:"name:ttt"`
+}
+
+type TT struct {
+	Hl string
 }
 
 type IIer interface {
@@ -58,9 +64,11 @@ type IIer interface {
 }
 
 type II struct {
+	A *string `inject:"name:hello"`
 }
 
 func (ii *II) Add(a, b int) int {
+	fmt.Println("ii.a->",ii.A)
 	return a + b
 }
 
@@ -80,22 +88,26 @@ func (d *DD) Add(a, b int) int { //注意：当有多个实现时，存在不确
 
 func init() {
 
-	gdi.RegisterObject(
+	gdi.Register(
 		&AA{},
 		&BB{},
 		func() *DD {
 			return &DD{}
 		},
 	) //可以一次注册多个对象
-	//gdi.RegisterObject(&BB{})
-	//gdi.RegisterObject(&DD{})
-	//gdi.RegisterObject(&CC{})
-	gdi.RegisterObject(&II{}) //简单对象
-	gdi.RegisterObject(&FF{
-		Addr: "SZ",
-	}) //简单对象
+	//gdi.Register(&BB{})
+	//gdi.Register(&DD{})
+	//gdi.Register(&CC{})
+	gdi.Register(func() (*II,string){
+		return &II{
 
-	gdi.RegisterObject(func() *CC { //复杂对象
+		},"ii"
+	}) //简单对象
+	//gdi.Register(&FF{
+	//	Addr: "SZ",
+	//}) //简单对象
+
+	gdi.Register(func() *CC { //复杂对象
 
 		age := func() int { //可进行复杂构造，这只是示例
 			return 10 + 4
@@ -106,16 +118,31 @@ func init() {
 		}
 	})
 
-	gdi.RegisterObject(func() (*EE, error) { //带错误的注册
+	gdi.Register(func() (*EE, error) { //带错误的注册
 
 		return &EE{}, nil
+	})
+
+	gdi.Register(func() (*TT,string) {
+
+		return &TT{
+			Hl: "aaaa",
+		},"ttt"
+	})
+
+	gdi.Register(func() (*string,string) {
+
+		var name string
+		name="xsdasdfaf"
+		return &name,"hello"
 	})
 
 }
 
 func main() {
-	gdi.Debug(true)
-	gdi.Init() //使用前必须先调用，当出现无解注入对象时会panic,避免运行时出现空指针
+	gdi.Debug(true)      //显示注入信息，方便排错，需在gdi.Init()方法之前调用
+	gdi.AutoCreate(true) //开启自动注入
+	gdi.Init()           //使用前必须先调用，当出现无解注入对象时会panic,避免运行时出现空指针
 	var a *AA
 	a = gdi.Get(a).(*AA) //说明，这里可以直接进行类型转换，不会出现空指针，当出现空指针时，gdi.Init()就会panic
 	fmt.Println(a.B.C.Name)
@@ -124,8 +151,13 @@ func main() {
 
 	fmt.Println(a.B.D.I.Add(2, 3))
 	fmt.Println(a.B.D.E.A.B.D.E.A.B.D.E.A.B.C.Age)
-	fmt.Println(a.B.D.E.Addr)
+	fmt.Println(a.B.D.E.A.B.C.Name)
+	fmt.Println(a.B.D.E.T.Hl)
+	//tl.Typelinks()
+	fmt.Println(*a.A)
+	gdi.Register()
 
 }
+
 
 ```
