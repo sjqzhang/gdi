@@ -39,7 +39,6 @@ package main
 import (
 	"fmt"
 	"github.com/sjqzhang/gdi"
-	//"github.com/sjqzhang/gdi/tl"
 )
 
 type AA struct {
@@ -71,6 +70,7 @@ type EE struct {
 type FF struct {
 	Addr string
 	T *TT `inject:"name:ttt"`
+	Hello *string  `inject:"name:hello"`
 }
 
 type TT struct {
@@ -82,11 +82,13 @@ type IIer interface {
 }
 
 type II struct {
-	A *string `inject:"name:hello"`
+	A string `inject:"name:hello"`
+	Home string `inject:"name:home"`
 }
 
 func (ii *II) Add(a, b int) int {
 	fmt.Println("ii.a->",ii.A)
+	fmt.Println("ii.home->",ii.Home)
 	return a + b
 }
 
@@ -166,16 +168,13 @@ func main() {
 	fmt.Println(a.B.C.Name)
 	fmt.Println(a.B.D.C.Age)
 	fmt.Println(a.B.D.Say("zhangsan"))
-
 	fmt.Println(a.B.D.I.Add(2, 3))
 	fmt.Println(a.B.D.E.A.B.D.E.A.B.D.E.A.B.C.Age)
 	fmt.Println(a.B.D.E.A.B.C.Name)
 	fmt.Println(a.B.D.E.T.Hl)
-	//tl.Typelinks()
+	fmt.Println(*a.B.D.E.Hello)
 	fmt.Println(*a.A)
-	gdi.Register()
 
 }
-
 
 ```
