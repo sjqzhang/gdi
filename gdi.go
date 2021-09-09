@@ -286,23 +286,16 @@ func (gdi *GDIPool) create(fun interface{}) []reflect.Value {
 }
 
 func (gdi *GDIPool) set(outType reflect.Type, f interface{}) {
-	if _, ok := gdi.get(outType); ok {
-		gdi.panic(fmt.Sprintf("double register %v", outType))
-		return
-	}
-	gdi.creatorLocker.Lock()
-	defer gdi.creatorLocker.Unlock()
-	if reflect.TypeOf(f).Kind() == reflect.Func && f != nil {
-		gdi.creator[outType] = f
-	}
-	gdi.ttvLocker.Lock()
-	defer gdi.ttvLocker.Unlock()
+
 	if f != nil {
 		if reflect.TypeOf(f).Kind() == reflect.Func {
 			vals := gdi.create(f)
 			if len(vals) == 1 {
 				gdi.typeToValues[outType] = vals[0]
 			} else if len(vals) == 2 && vals[1].Kind() == reflect.String {
+				if _, ok := gdi.namesToValues[vals[1].Interface().(string)]; ok {
+					gdi.panic(fmt.Sprintf("double register name: '%v'", vals[1].Interface().(string)))
+				}
 				gdi.namesToValues[vals[1].Interface().(string)] = vals[0]
 			}
 			gdi.log(fmt.Sprintf("inject %v success", outType))
@@ -313,6 +306,18 @@ func (gdi *GDIPool) set(outType reflect.Type, f interface{}) {
 			//gdi.typeToValues[outType] = reflect.ValueOf(f)
 			gdi.panic(fmt.Sprintf("%v type not support ", reflect.TypeOf(f)))
 		}
+	} else {
+		if _, ok := gdi.get(outType); ok {
+			gdi.panic(fmt.Sprintf("double register %v", outType))
+			return
+		}
+		gdi.creatorLocker.Lock()
+		defer gdi.creatorLocker.Unlock()
+		if reflect.TypeOf(f).Kind() == reflect.Func && f != nil {
+			gdi.creator[outType] = f
+		}
+		gdi.ttvLocker.Lock()
+		defer gdi.ttvLocker.Unlock()
 	}
 }
 
