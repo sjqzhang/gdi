@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 )
@@ -92,6 +93,9 @@ func (gdi *GDIPool) Init() *GDIPool {
 	for _, v := range gdi.typeToValues {
 		gdi.build(v)
 	}
+	for _, v := range gdi.namesToValues {
+		gdi.build(v)
+	}
 	return gdi
 }
 
@@ -106,6 +110,9 @@ func (gdi *GDIPool) all() map[reflect.Type]reflect.Value {
 }
 
 func (gdi *GDIPool) build(v reflect.Value) {
+	if v.Elem().Kind() != reflect.Struct {
+		return
+	}
 	for i := 0; i < v.Elem().NumField(); i++ {
 		if (v.Elem().Field(i).Kind() == reflect.Ptr || v.Elem().Field(i).Kind() == reflect.Interface) && v.Elem().Field(i).IsNil() && v.Elem().Field(i).CanSet() {
 			ftype := reflect.TypeOf(v.Elem().Field(i).Interface())
@@ -139,12 +146,13 @@ func (gdi *GDIPool) build(v reflect.Value) {
 						v.Elem().Field(i).Set(value)
 						gdi.log(fmt.Sprintf("inject by name the field %v of %v by %v", fieldName, v.Type(), fieldType))
 						continue
+					} else {
+						gdi.panic(fmt.Sprintf("the name of '%v' not found,please register first", name))
 					}
 				}
 				if ftype.Elem().Kind() != reflect.Struct {
 					gdi.warn(fmt.Sprintf("(WARNNING) inject %v ignore of %v,type just support Struct ", ftype, v.Type()))
 					continue
-
 				}
 				if value, ok := gdi.get(ftype); ok {
 					v.Elem().Field(i).Set(value)
@@ -186,7 +194,7 @@ func (gdi *GDIPool) Get(t interface{}) (value interface{}) {
 		result, ok = gdi.get(ftype)
 	}
 	if !ok {
-		gdi.warn(fmt.Sprintf("can't found %v,Is gdi.Init() called?",t))
+		gdi.warn(fmt.Sprintf("can't found %v,Is gdi.Init() called?", t))
 		return nil
 	}
 	return result.Interface()
@@ -251,8 +259,11 @@ func (gdi *GDIPool) warn(msg string) {
 }
 
 func (gdi *GDIPool) panic(msg string) {
+	var buf [2 << 10]byte
 	log.Println("PANIC:  注意查看以下提示（WARNNING:Pay attention to the following tips）")
+	log.Println(string(buf[:runtime.Stack(buf[:], true)]))
 	log.Fatal(msg)
+
 }
 
 func (gdi *GDIPool) create(fun interface{}) []reflect.Value {
@@ -320,7 +331,7 @@ func (gdi *GDIPool) parsePoolFunc(f interface{}) (outType reflect.Type, e error)
 		return
 	}
 	outType = ftype.Out(0)
-	if outType.Kind() != reflect.Ptr {
+	if outType.Kind() != reflect.Ptr && outType.Kind() != reflect.Interface {
 		e = errors.New("the first return value must be an object pointer")
 		return
 	}
