@@ -170,7 +170,8 @@ func (gdi *GDIPool) build(v reflect.Value) {
 					}
 				}
 			}
-		} else if !v.Elem().Field(i).CanSet() && (v.Elem().Field(i).Kind() == reflect.Ptr || v.Elem().Field(i).Kind() == reflect.Interface) {
+		} else if !v.Elem().Field(i).CanSet() && (v.Elem().Field(i).Kind() == reflect.Ptr || v.Elem().Field(i).Kind() == reflect.Interface) && v.Elem().Field(i).IsNil() {
+
 			gdi.warn(fmt.Sprintf("pointer %v injected by %v fail,because field not export", v.Elem().Field(i).Type(), reflect.TypeOf(v.Elem().Field(i))))
 		}
 
