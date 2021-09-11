@@ -53,8 +53,8 @@ func Get(t interface{}) (value interface{}) {
 	return globalGDI.Get(t)
 }
 
-func New(t interface{}) (value interface{}, err error) {
-	return globalGDI.New(t)
+func DI(t interface{}) (value interface{}, err error) {
+	return globalGDI.DI(t)
 }
 
 func GetWithCheck(t interface{}) (value interface{}, ok bool) {
@@ -85,15 +85,62 @@ func (gdi *GDIPool) Register(funcObjOrPtrs ...interface{}) {
 			gdi.set(ftype, funcObjOrPtr)
 			continue
 		}
-		ftype, err := gdi.parsePoolFunc(funcObjOrPtr)
+		outType, err := gdi.parsePoolFunc(funcObjOrPtr)
 		if err != nil {
 			gdi.panic(err.Error())
 		}
-		gdi.set(ftype, funcObjOrPtr)
+		if ftype.Kind() == reflect.Func {
+			if ftype.NumIn() == 0 {
+				gdi.set(outType, funcObjOrPtr)
+			} else {
+				gdi.creator[outType] = funcObjOrPtr
+			}
+		}
 	}
 }
 
 func (gdi *GDIPool) Init() *GDIPool {
+
+	for k := 0; k < len(gdi.creator)*len(gdi.creator); k++ {
+		i := len(gdi.creator)
+		j := 0
+		for outype, creator := range gdi.creator {
+			if _, ok := gdi.get(outype); ok {
+				j++
+			} else {
+				funcType := reflect.TypeOf(creator)
+				if funcType.Kind() == reflect.Func {
+					if funcType.NumIn() == 0 {
+						continue
+					}
+					var args []reflect.Value
+					for n := 0; n < funcType.NumIn(); n++ {
+
+						//t:=reflect.TypeOf(funcType.In(n))
+						if itype, ok := gdi.get(funcType.In(n)); ok {
+							args = append(args, itype)
+						} else {
+							break
+						}
+					}
+					if funcType.NumIn() == len(args) {
+						values := reflect.ValueOf(creator).Call(args)
+						if len(values) > 1 && values[1].Kind() == reflect.String {
+							name := values[1].Interface()
+							gdi.namesToValues[name.(string)] = values[0]
+						}
+						if len(values) == 1 {
+							gdi.typeToValues[outype] = values[0]
+						}
+					}
+				}
+			}
+		}
+		if i == j {
+			break
+		}
+	}
+
 	for _, v := range gdi.typeToValues {
 		gdi.build(v)
 	}
@@ -189,7 +236,7 @@ func Debug(isDebug bool) {
 	globalGDI.debug = isDebug
 }
 
-func (gdi *GDIPool) New(t interface{}) (value interface{}, err error) {
+func (gdi *GDIPool) DI(t interface{}) (value interface{}, err error) {
 	var result reflect.Value
 	ftype := reflect.TypeOf(t)
 	if ftype.Kind() != reflect.Ptr {
