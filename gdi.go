@@ -53,6 +53,10 @@ func Get(t interface{}) (value interface{}) {
 	return globalGDI.Get(t)
 }
 
+func Invoke(t interface{}) error {
+	return globalGDI.Invoke(t)
+}
+
 func DI(t interface{}) (value interface{}, err error) {
 	return globalGDI.DI(t)
 }
@@ -245,6 +249,35 @@ func (gdi *GDIPool) DI(t interface{}) (value interface{}, err error) {
 	result = reflect.New(ftype.Elem())
 	gdi.build(result)
 	return result.Interface(), nil
+}
+
+func (gdi *GDIPool) Invoke(t interface{}) error {
+	ftype := reflect.TypeOf(t)
+	funValue := reflect.ValueOf(t)
+	if ftype.Kind() == reflect.Func {
+		var args []reflect.Value
+		for i := 0; i < ftype.NumIn(); i++ {
+			if v, ok := gdi.get(ftype.In(i)); ok {
+				args = append(args, v)
+			}
+		}
+		if ftype.NumIn() != len(args) {
+			return errors.New("")
+		}
+		values := funValue.Call(args)
+		if len(values) == 0 {
+			return nil
+		}
+		if last := values[len(values)-1]; last.Type().Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+			if err, _ := last.Interface().(error); err != nil {
+				return err
+			}
+		}
+	} else {
+		return errors.New("(ERROR) just support func ")
+	}
+	return nil
+
 }
 
 func (gdi *GDIPool) Get(t interface{}) (value interface{}) {
