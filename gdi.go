@@ -53,7 +53,7 @@ func Get(t interface{}) (value interface{}) {
 	return globalGDI.Get(t)
 }
 
-func Invoke(t interface{}) error {
+func Invoke(t interface{}) (interface{}, error) {
 	return globalGDI.Invoke(t)
 }
 
@@ -132,10 +132,18 @@ func (gdi *GDIPool) Init() *GDIPool {
 						if len(values) > 1 && values[1].Kind() == reflect.String {
 							name := values[1].Interface()
 							gdi.namesToValues[name.(string)] = values[0]
+
+						}
+						if len(values) > 1 && values[1].Type().Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+							if values[1].Interface() != nil {
+								gdi.panic(fmt.Sprintf("(ERROR)create %v fail %v", outype, funcType))
+							}
+							gdi.typeToValues[outype] = values[0]
 						}
 						if len(values) == 1 {
 							gdi.typeToValues[outype] = values[0]
 						}
+						gdi.log(fmt.Sprintf("inject type %v over by %v success", outype, funcType))
 					}
 				}
 			}
@@ -251,7 +259,7 @@ func (gdi *GDIPool) DI(t interface{}) (value interface{}, err error) {
 	return result.Interface(), nil
 }
 
-func (gdi *GDIPool) Invoke(t interface{}) error {
+func (gdi *GDIPool) Invoke(t interface{}) (interface{}, error) {
 	ftype := reflect.TypeOf(t)
 	funValue := reflect.ValueOf(t)
 	if ftype.Kind() == reflect.Func {
@@ -259,24 +267,32 @@ func (gdi *GDIPool) Invoke(t interface{}) error {
 		for i := 0; i < ftype.NumIn(); i++ {
 			if v, ok := gdi.get(ftype.In(i)); ok {
 				args = append(args, v)
+			} else {
+				gdi.warn(fmt.Sprintf("type '%v' not register", ftype))
 			}
 		}
 		if ftype.NumIn() != len(args) {
-			return errors.New("")
+			return nil, errors.New("(WARNING) can't inject all parameters!!!")
 		}
 		values := funValue.Call(args)
 		if len(values) == 0 {
-			return nil
+			return nil, nil
 		}
 		if last := values[len(values)-1]; last.Type().Implements(reflect.TypeOf((*error)(nil)).Elem()) {
 			if err, _ := last.Interface().(error); err != nil {
-				return err
+				return nil, err
+			}
+			if len(values) == 1 {
+				return nil, last.Interface().(error)
+			}
+			if len(values) >= 2 {
+				return values[0].Interface(), last.Interface().(error)
 			}
 		}
 	} else {
-		return errors.New("(ERROR) just support func ")
+		return nil, errors.New("(ERROR) just support func ")
 	}
-	return nil
+	return nil, nil
 
 }
 
@@ -393,6 +409,12 @@ func (gdi *GDIPool) set(outType reflect.Type, f interface{}) {
 					gdi.panic(fmt.Sprintf("double register name: '%v'", vals[1].Interface().(string)))
 				}
 				gdi.namesToValues[vals[1].Interface().(string)] = vals[0]
+			} else if len(vals) == 2 && vals[1].Type().Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+				if vals[1].Interface() != nil {
+					gdi.panic(fmt.Sprintf("(ERROR) create %v '%v'", outType, vals[1].Interface().(string)))
+				}
+				gdi.typeToValues[outType] = vals[0]
+
 			}
 			gdi.log(fmt.Sprintf("inject %v success", outType))
 		} else if reflect.TypeOf(f).Kind() == reflect.Ptr {
