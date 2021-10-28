@@ -57,8 +57,8 @@ func Invoke(t interface{}) (interface{}, error) {
 	return globalGDI.Invoke(t)
 }
 
-func DI(t interface{}) (value interface{}, err error) {
-	return globalGDI.DI(t)
+func DI(pointer interface{}) error {
+	return globalGDI.DI(pointer)
 }
 
 func GetWithCheck(t interface{}) (value interface{}, ok bool) {
@@ -248,15 +248,18 @@ func Debug(isDebug bool) {
 	globalGDI.debug = isDebug
 }
 
-func (gdi *GDIPool) DI(t interface{}) (value interface{}, err error) {
+func (gdi *GDIPool) DI(pointer interface{}) error {
 	var result reflect.Value
-	ftype := reflect.TypeOf(t)
+	ftype := reflect.TypeOf(pointer)
 	if ftype.Kind() != reflect.Ptr {
-		return nil, errors.New("(ERROR) pointer type require")
+		return errors.New("(ERROR) pointer type require")
 	}
-	result = reflect.New(ftype.Elem())
+	result = reflect.ValueOf(pointer)
+	if result.IsNil() {
+		return errors.New("(ERROR) pointer is null ")
+	}
 	gdi.build(result)
-	return result.Interface(), nil
+	return nil
 }
 
 func (gdi *GDIPool) Invoke(t interface{}) (interface{}, error) {
