@@ -501,6 +501,9 @@ func (p *HandlerFactory) Call(name string, args ...interface{}) (interface{}, er
 			}
 		}
 		values := m.mv.Call(vals)
+		if len(values) == 0 {
+			return nil, nil
+		}
 		if last := values[len(values)-1]; last.Type().Implements(reflect.TypeOf((*error)(nil)).Elem()) {
 			var er error
 			if last.Interface() != nil {
@@ -515,8 +518,12 @@ func (p *HandlerFactory) Call(name string, args ...interface{}) (interface{}, er
 			if len(values) >= 2 {
 				return values[0].Interface(), er
 			}
+		} else {
+			if len(values) == 1 {
+				return values[0].Interface(), nil
+			}
 		}
-		return nil, nil
+		return values[len(values)-1].Interface(), nil
 	} else {
 		return nil, fmt.Errorf("%s not found", name)
 	}
