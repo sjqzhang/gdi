@@ -40,7 +40,6 @@ func NewGDIPool() *GDIPool {
 }
 
 func Register(funcObjOrPtrs ...interface{}) {
-
 	globalGDI.Register(funcObjOrPtrs...)
 
 }
@@ -282,14 +281,18 @@ func (gdi *GDIPool) Invoke(t interface{}) (interface{}, error) {
 			return nil, nil
 		}
 		if last := values[len(values)-1]; last.Type().Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+			var er error
+			if last.Interface() != nil {
+				er = last.Interface().(error)
+			}
 			if err, _ := last.Interface().(error); err != nil {
-				return nil, err
+				return nil, er
 			}
 			if len(values) == 1 {
-				return nil, last.Interface().(error)
+				return nil, er
 			}
 			if len(values) >= 2 {
-				return values[0].Interface(), last.Interface().(error)
+				return values[0].Interface(), er
 			}
 		}
 	} else {
@@ -462,4 +465,122 @@ func (gdi *GDIPool) parsePoolFunc(f interface{}) (outType reflect.Type, e error)
 		return
 	}
 	return
+}
+
+type HandlerFactory struct {
+	process map[string]*methodInfo
+	lock    *sync.Mutex
+}
+
+type methodInfo struct {
+	mt reflect.Method
+	mv reflect.Value
+}
+
+func NewHandlerFactory() *HandlerFactory {
+	return &HandlerFactory{
+		process: make(map[string]*methodInfo, 100),
+		lock:    &sync.Mutex{},
+	}
+}
+
+func (p *HandlerFactory) Call(name string, args ...interface{}) (interface{}, error) {
+	if m, ok := p.process[name]; ok {
+		method := m.mt
+		t1 := method.Type
+
+		if len(args) != t1.NumIn()-1 {
+			return nil, fmt.Errorf("The number of parameters is different!")
+		}
+		var vals []reflect.Value
+		for i := 0; i < t1.NumIn(); i++ {
+			for j := 0; j < len(args); j++ {
+				if reflect.TypeOf(args[j]) == t1.In(i) {
+					vals = append(vals, reflect.ValueOf(args[j]))
+				}
+			}
+		}
+		values := m.mv.Call(vals)
+		if last := values[len(values)-1]; last.Type().Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+			var er error
+			if last.Interface() != nil {
+				er = last.Interface().(error)
+			}
+			if err, _ := last.Interface().(error); err != nil {
+				return nil, er
+			}
+			if len(values) == 1 {
+				return nil, er
+			}
+			if len(values) >= 2 {
+				return values[0].Interface(), er
+			}
+		}
+		return nil, nil
+	} else {
+		return nil, fmt.Errorf("%s not found", name)
+	}
+
+}
+
+type Error struct {
+	msg string
+}
+
+func (g *Error) Error() string {
+	return g.msg
+}
+
+func NewError(msg string) *Error {
+	return &Error{
+		msg: msg,
+	}
+}
+
+func (p *HandlerFactory) AddHandler(v interface{}) {
+	t1 := reflect.TypeOf(v)
+	v1 := reflect.ValueOf(v)
+	if v1.IsNil() {
+		panic("传递的对象不能为空！")
+	}
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	if t1.Kind() == reflect.Ptr && t1.Elem().Kind() == reflect.Struct {
+		for i := 0; i < t1.NumMethod(); i++ {
+			pt := t1.Method(i).Type
+			ok := false
+			//if pt.NumOut() > 1 {
+			//	panic("函数的返回值只能是一个，并且是error类型，如需返回值需要参数中传递对象指针作为返回用途")
+			//}
+			if pt.NumOut() > 0 {
+				if !pt.Out(pt.NumOut() - 1).Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+					panic("函数的返回值只能是error类型，如需返回值需要参数中传递对象指针作为返回用途")
+				}
+			}
+			for j := 1; j < pt.NumIn(); j++ {
+				if pt.In(j).Kind() == reflect.Ptr && pt.In(j).Elem().Kind() == reflect.Struct {
+					ok = true
+				}
+				if pt.NumIn() > 2 {
+					for k := j + 1; k < pt.NumIn(); k++ {
+						if pt.In(j).Kind() == pt.In(k).Kind() {
+							panic("函数中不能带有相同类型的参数，如有同类型的参数需要进行类型封装，再进行传递")
+						}
+					}
+				}
+
+			}
+			if !ok {
+				//panic("你的函数参数中必须带有一个结构体的指针用于返回值！")
+			}
+			info := &methodInfo{
+				mt: t1.Method(i),
+				mv: v1.Method(i),
+			}
+			p.process[t1.Method(i).Name] = info
+		}
+	} else {
+		panic("注册的Handler对象必须是struct指针")
+	}
+
 }
