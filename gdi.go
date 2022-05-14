@@ -46,6 +46,9 @@ func Register(funcObjOrPtrs ...interface{}) {
 }
 
 func AutoCreate(autoCreate bool) {
+	if autoCreate {
+		globalGDI.Debug(autoCreate)
+	}
 	globalGDI.AutoCreate(autoCreate)
 }
 
@@ -235,7 +238,7 @@ func (gdi *GDIPool) build(v reflect.Value) {
 			}
 		} else if !v.Elem().Field(i).CanSet() && (v.Elem().Field(i).Kind() == reflect.Ptr || v.Elem().Field(i).Kind() == reflect.Interface) && v.Elem().Field(i).IsNil() {
 
-			setPrivateField := func(v reflect.Value, i int) {//not export fields
+			setPrivateField := func(v reflect.Value, i int) { //not export fields
 				defer func() {
 					if err := recover(); err != nil {
 						gdi.panic("(WARNNING) setPrivateField" + err.(error).Error())
@@ -247,8 +250,8 @@ func (gdi *GDIPool) build(v reflect.Value) {
 						return
 					}
 					rf = reflect.NewAt(rf.Type(), unsafe.Pointer(rf.UnsafeAddr())).Elem()
-					fieldName:=v.Elem().Type().Field(i).Name
-					ftype:=v.Elem().Type().Field(i).Type
+					fieldName := v.Elem().Type().Field(i).Name
+					ftype := v.Elem().Type().Field(i).Type
 					if value, ok := gdi.get(rf.Type()); ok {
 						rf.Set(value)
 					} else {
