@@ -30,7 +30,7 @@ func init() {
 func NewGDIPool() *GDIPool {
 
 	return &GDIPool{
-		debug:         false,
+		debug:         true,
 		autoCreate:    false,
 		creator:       make(map[reflect.Type]interface{}),
 		creatorLocker: sync.RWMutex{},
@@ -198,7 +198,7 @@ func (gdi *GDIPool) build(v reflect.Value) {
 				for t, vTmp := range gdi.all() {
 					if t.Implements(v.Elem().Field(i).Type()) {
 						v.Elem().Field(i).Set(vTmp)
-						gdi.log(fmt.Sprintf(`inject by interface type: "%v" fieldName: "%v" of "%v"`, ftype, fieldName, v.Type()))
+						gdi.log(fmt.Sprintf(`inject by interface type: "%v" fieldName: "%v" of "%v"`, t, fieldName, v.Type()))
 						isExist = true
 						break
 					}
@@ -260,7 +260,7 @@ func (gdi *GDIPool) build(v reflect.Value) {
 					if ok {
 						if value, ok := gdi.namesToValues[name]; ok {
 							rf.Set(value)
-							gdi.log(fmt.Sprintf(`inject by name: "%v" fieldName: "%v" of "%v"`, name, fieldName, v.Type()))
+							gdi.log(fmt.Sprintf(`inject unexported by name: "%v" fieldName: "%v" of "%v"`, name, fieldName, v.Type()))
 							return
 						}
 					}
@@ -272,10 +272,10 @@ func (gdi *GDIPool) build(v reflect.Value) {
 							rf.Set(value)
 							gdi.set(rf.Type(), value.Interface()) //must understand the reflect type and reflect value and interface{} relation
 							gdi.build(value)
-							gdi.log(fmt.Sprintf(`autocreate type: "%v" fieldName: "%v" of "%v"`, ftype, fieldName, v.Type()))
+							gdi.log(fmt.Sprintf(`autocreate unexported type: "%v" fieldName: "%v" of "%v"`, ftype, fieldName, v.Type()))
 						}
 					}
-					gdi.log(fmt.Sprintf(`inject by type: "%v" fieldName: "%v" of "%v"`, rf.Type(), fieldName, v.Type()))
+					gdi.log(fmt.Sprintf(`inject unexported by type: "%v" fieldName: "%v" of "%v"`, rf.Type(), fieldName, v.Type()))
 				}
 			}
 
