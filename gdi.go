@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"unsafe"
 )
 
 var globalGDI *GDIPool
@@ -234,10 +235,74 @@ func (gdi *GDIPool) build(v reflect.Value) {
 			}
 		} else if !v.Elem().Field(i).CanSet() && (v.Elem().Field(i).Kind() == reflect.Ptr || v.Elem().Field(i).Kind() == reflect.Interface) && v.Elem().Field(i).IsNil() {
 
-			gdi.panic(fmt.Sprintf("the field '%v' of '%v' inject faild,can't inject field not export", v.Elem().Type().Field(i).Name, v.Elem().Type().String()))
+			setPrivateField := func(v reflect.Value, i int) {//not export fields
+				defer func() {
+					if err := recover(); err != nil {
+						gdi.panic("(WARNNING) setPrivateField" + err.(error).Error())
+					}
+				}()
+				if !v.Elem().Field(i).CanSet() { //私有变量
+					rf := v.Elem().Field(i)
+					if rf.Kind() == reflect.Interface {
+						return
+					}
+					rf = reflect.NewAt(rf.Type(), unsafe.Pointer(rf.UnsafeAddr())).Elem()
+					fieldName:=v.Elem().Type().Field(i).Name
+					ftype:=v.Elem().Type().Field(i).Type
+					if value, ok := gdi.get(rf.Type()); ok {
+						rf.Set(value)
+					} else {
+						if gdi.autoCreate {
+							value = reflect.New(rf.Type().Elem())
+							rf.Set(value)
+							gdi.set(rf.Type(), value.Interface()) //must understand the reflect type and reflect value and interface{} relation
+							gdi.build(value)
+							gdi.log(fmt.Sprintf("autocreate %v inject by type the field %v for %v ", ftype, fieldName, v.Type()))
+						}
+					}
+				}
+			}
+
+			setPrivateField(v, i)
+
+			//gdi.panic(fmt.Sprintf("the field '%v' of '%v' inject faild,can't inject field not export", v.Elem().Type().Field(i).Name, v.Elem().Type().String()))
 		}
 
 	}
+}
+
+func GetPtrUnExportFiled(s interface{}, filed string) reflect.Value {
+	v := reflect.ValueOf(s).Elem().FieldByName(filed)
+	// 必须要调用 Elem()
+	return reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem()
+}
+
+func GetPtrUnExportFiledByIndex(s interface{}, index int) reflect.Value {
+	v := reflect.ValueOf(s).Elem().Field(index)
+	// 必须要调用 Elem()
+	return reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem()
+}
+
+func SetPtrUnExportFiledByIndex(s interface{}, index int, val interface{}) error {
+	v := GetPtrUnExportFiledByIndex(s, index)
+	rv := reflect.ValueOf(val)
+	if v.Kind() != v.Kind() {
+		return fmt.Errorf("invalid kind, expected kind: %v, got kind:%v", v.Kind(), rv.Kind())
+	}
+
+	v.Set(rv)
+	return nil
+}
+
+func SetPtrUnExportFiled(s interface{}, filed string, val interface{}) error {
+	v := GetPtrUnExportFiled(s, filed)
+	rv := reflect.ValueOf(val)
+	if v.Kind() != v.Kind() {
+		return fmt.Errorf("invalid kind, expected kind: %v, got kind:%v", v.Kind(), rv.Kind())
+	}
+
+	v.Set(rv)
+	return nil
 }
 
 func (gdi *GDIPool) Debug(isDebug bool) {

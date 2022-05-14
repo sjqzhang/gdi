@@ -144,5 +144,6 @@ func main() {
 	gdi.Register()
 
 
+	gdi.NewHandlerFactory()
 
 }
