@@ -7,7 +7,7 @@ import (
 
 type gdiTest struct {
 	Name string
-	f    *string
+	f    *string `inject:"name:test"`
 }
 
 type gdiTest2 struct {
@@ -27,6 +27,7 @@ func TestAll(t *testing.T) {
 
 	name := "gdi"
 	gp := NewGDIPool()
+	gp.Debug(true)
 	gp.Register(&gdiTest{
 		Name: name,
 	}, func() *gdiTest2 {
@@ -41,6 +42,20 @@ func TestAll(t *testing.T) {
 	gp.Init()
 	var g *gdiTest
 	var g2 *gdiTest2
+
+	type Inner struct {
+		g *gdiTest
+		g2 *gdiTest2
+	}
+
+	var i Inner
+
+	gp.DI(&i)
+
+
+
+
+
 	if gp.Get(g).(*gdiTest).Name != name {
 		t.Fail()
 	}

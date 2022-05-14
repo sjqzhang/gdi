@@ -183,13 +183,14 @@ func (gdi *GDIPool) build(v reflect.Value) {
 		if (v.Elem().Field(i).Kind() == reflect.Ptr || v.Elem().Field(i).Kind() == reflect.Interface) && v.Elem().Field(i).IsNil() && v.Elem().Field(i).CanSet() {
 			ftype := reflect.TypeOf(v.Elem().Field(i).Interface())
 			fieldName := reflect.TypeOf(v.Elem().Interface()).Field(i).Name
-			fieldType := reflect.TypeOf(v.Elem().Interface()).Field(i).Type
+			//fieldType := reflect.TypeOf(v.Elem().Interface()).Field(i).Type
 			if ftype == nil { //当为接口时ftype为空
 				name, ok := gdi.getTagAttr(reflect.TypeOf(v.Elem().Interface()).Field(i), "name")
 				if ok {
 					if value, ok := gdi.namesToValues[name]; ok {
 						v.Elem().Field(i).Set(value)
-						gdi.log(fmt.Sprintf("inject by name the field %v of %v by %v", fieldName, v.Type(), fieldType))
+						//gdi.log(fmt.Sprintf("inject by name the field %v of %v by %v", fieldName, v.Type(), fieldType))
+						gdi.log(fmt.Sprintf(`inject by name: "%v" fieldName: "%v" of "%v"`, name, fieldName, v.Type()))
 						continue
 					}
 				}
@@ -197,7 +198,7 @@ func (gdi *GDIPool) build(v reflect.Value) {
 				for t, vTmp := range gdi.all() {
 					if t.Implements(v.Elem().Field(i).Type()) {
 						v.Elem().Field(i).Set(vTmp)
-						gdi.log(fmt.Sprintf("inject interface by type the field %v of %v by %v", fieldName, v.Type(), fieldType))
+						gdi.log(fmt.Sprintf(`inject by interface type: "%v" fieldName: "%v" of "%v"`, ftype, fieldName, v.Type()))
 						isExist = true
 						break
 					}
@@ -210,7 +211,9 @@ func (gdi *GDIPool) build(v reflect.Value) {
 				if ok {
 					if value, ok := gdi.namesToValues[name]; ok {
 						v.Elem().Field(i).Set(value)
-						gdi.log(fmt.Sprintf("inject by name the field %v of %v by %v", fieldName, v.Type(), fieldType))
+						//gdi.log(fmt.Sprintf("inject by name the field %v of %v by %v", fieldName, v.Type(), fieldType))
+						gdi.log(fmt.Sprintf(`inject by name: "%v" fieldName: "%v" of "%v"`, name, fieldName, v.Type()))
+
 						continue
 					} else {
 						gdi.panic(fmt.Sprintf("the name of '%v' not found,please register first", name))
@@ -222,7 +225,7 @@ func (gdi *GDIPool) build(v reflect.Value) {
 				}
 				if value, ok := gdi.get(ftype); ok {
 					v.Elem().Field(i).Set(value)
-					gdi.log(fmt.Sprintf("inject by type the field %v of %v by %v", fieldName, v.Type(), fieldType))
+					gdi.log(fmt.Sprintf(`inject type: "%v" fieldName: "%v" of "%v"`, ftype, fieldName, v.Type()))
 					continue
 				} else {
 					if gdi.autoCreate {
@@ -230,7 +233,8 @@ func (gdi *GDIPool) build(v reflect.Value) {
 						v.Elem().Field(i).Set(value)
 						gdi.set(ftype, value.Interface()) //must understand the reflect type and reflect value and interface{} relation
 						gdi.build(value)
-						gdi.log(fmt.Sprintf("autocreate %v inject by type the field %v of %v by %v", ftype, fieldName, v.Type(), fieldType))
+						gdi.log(fmt.Sprintf(`autocreate type: "%v" fieldName: "%v" of "%v"`, ftype, fieldName, v.Type()))
+						//gdi.log(fmt.Sprintf("autocreate %v inject by type the field %v of %v by %v", ftype, fieldName, v.Type(), fieldType))
 					} else {
 						gdi.panic(fmt.Sprintf("the field '%v' of '%v' inject faild,please Register first!!!! ", v.Elem().Type().Field(i).Name, v.Elem().Type().String()))
 					}
@@ -249,9 +253,17 @@ func (gdi *GDIPool) build(v reflect.Value) {
 					if rf.Kind() == reflect.Interface {
 						return
 					}
+					name, ok := gdi.getTagAttr(v.Elem().Type().Field(i), "name")
 					rf = reflect.NewAt(rf.Type(), unsafe.Pointer(rf.UnsafeAddr())).Elem()
 					fieldName := v.Elem().Type().Field(i).Name
 					ftype := v.Elem().Type().Field(i).Type
+					if ok {
+						if value, ok := gdi.namesToValues[name]; ok {
+							rf.Set(value)
+							gdi.log(fmt.Sprintf(`inject by name: "%v" fieldName: "%v" of "%v"`, name, fieldName, v.Type()))
+							return
+						}
+					}
 					if value, ok := gdi.get(rf.Type()); ok {
 						rf.Set(value)
 					} else {
@@ -260,9 +272,10 @@ func (gdi *GDIPool) build(v reflect.Value) {
 							rf.Set(value)
 							gdi.set(rf.Type(), value.Interface()) //must understand the reflect type and reflect value and interface{} relation
 							gdi.build(value)
-							gdi.log(fmt.Sprintf("autocreate %v inject by type the field %v for %v ", ftype, fieldName, v.Type()))
+							gdi.log(fmt.Sprintf(`autocreate type: "%v" fieldName: "%v" of "%v"`, ftype, fieldName, v.Type()))
 						}
 					}
+					gdi.log(fmt.Sprintf(`inject by type: "%v" fieldName: "%v" of "%v"`, rf.Type(), fieldName, v.Type()))
 				}
 			}
 
@@ -482,15 +495,17 @@ func (gdi *GDIPool) set(outType reflect.Type, f interface{}) {
 				if _, ok := gdi.namesToValues[vals[1].Interface().(string)]; ok {
 					gdi.panic(fmt.Sprintf("double register name: '%v'", vals[1].Interface().(string)))
 				}
-				gdi.namesToValues[vals[1].Interface().(string)] = vals[0]
+				name:=vals[1].Interface().(string)
+				gdi.namesToValues[name] = vals[0]
+				gdi.log(fmt.Sprintf("register by name, name:%v type:%v success", name,vals[0].Type()))
+				return
 			} else if len(vals) == 2 && vals[1].Type().Implements(reflect.TypeOf((*error)(nil)).Elem()) {
 				if vals[1].Interface() != nil {
 					gdi.panic(fmt.Sprintf("(ERROR) create %v '%v'", outType, vals[1].Interface().(string)))
 				}
 				gdi.typeToValues[outType] = vals[0]
-
 			}
-			gdi.log(fmt.Sprintf("inject %v success", outType))
+			gdi.log(fmt.Sprintf("register by type, type:%v success", outType))
 		} else if reflect.TypeOf(f).Kind() == reflect.Ptr {
 			gdi.typeToValues[outType] = reflect.ValueOf(f)
 			//gdi.log(fmt.Sprintf("inject %v success", outType))
