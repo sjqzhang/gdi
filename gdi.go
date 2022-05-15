@@ -35,7 +35,7 @@ func NewGDIPool() *GDIPool {
 
 	return &GDIPool{
 		debug:           true,
-		autoCreate:      true,
+		autoCreate:      false,
 		ignoreInterface: false,
 		creator:         make(map[reflect.Type]interface{}),
 		creatorLocker:   sync.RWMutex{},
@@ -189,6 +189,8 @@ func (gdi *GDIPool) build(v reflect.Value) {
 	}
 	for i := 0; i < v.Elem().NumField(); i++ {
 		field := v.Elem().Field(i)
+		packName:=v.Type().Elem().PkgPath()
+		gdi.log(packName)
 		if field.Kind() != reflect.Interface && field.Kind() != reflect.Ptr {
 			continue
 		}
@@ -215,7 +217,10 @@ func (gdi *GDIPool) build(v reflect.Value) {
 				gdi.panic(fmt.Sprintf("name:%v type:%v object not found", name, field.Type()))
 			}
 		}
-		if field.Kind() == reflect.Interface && field.IsNil() {
+		if field.Kind() == reflect.Interface  {
+			if !field.IsNil() {
+				continue
+			}
 			if gdi.ignoreInterface {
 				continue
 			}
