@@ -3,11 +3,9 @@ package gdi
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"reflect"
-	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -34,20 +32,11 @@ func init() {
 }
 
 func NewGDIPool() *GDIPool {
-	dir, _ := os.Getwd()
-	mod, err := ioutil.ReadFile(dir + "/" + "go.mod")
 	modName := "main"
-	if err == nil {
-		exp := regexp.MustCompile(`module\s+([^\n]+?)[\n\r]`)
-		pkgPath := exp.FindAllStringSubmatch(string(mod), -1)
-		if len(pkgPath) == 1 && len(pkgPath[0]) == 2 {
-			modName = pkgPath[0][1]
-		}
-	}
 	return &GDIPool{
 		debug:           true,
 		scanPkgPaths:    []string{modName},
-		ignoreInterface: false,
+		ignoreInterface: true,
 		creator:         make(map[reflect.Type]interface{}),
 		creatorLocker:   sync.RWMutex{},
 		typeToValues:    make(map[reflect.Type]reflect.Value),
@@ -86,6 +75,10 @@ func GetWithCheck(t interface{}) (value interface{}, ok bool) {
 
 func Init() {
 	globalGDI.Init()
+}
+
+func (gdi *GDIPool)IgnoreInterfaceInject(isIgnoreInterfaceInject bool) {
+	gdi.ignoreInterface = isIgnoreInterfaceInject
 }
 
 func (gdi *GDIPool) ScanPkgPaths(scanPaths ...string) {
@@ -229,6 +222,7 @@ func (gdi *GDIPool) build(v reflect.Value) {
 				continue
 			}
 			if gdi.ignoreInterface {
+				gdi.warn(fmt.Sprintf("\u001B[1;31mignore type:%v fieldName:%v of %v\u001B[0m", field.Type(), fieldName, v.Type()))
 				continue
 			}
 			if im, err := gdi.getByInterface(field.Type()); err == nil {
