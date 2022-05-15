@@ -395,7 +395,7 @@ func (gdi *GDIPool) getByInterface(i reflect.Type) (value reflect.Value, err err
 		msg := fmt.Sprintf("there is one more object impliment %v interface [%v].", i.Name(), strings.Join(msgs, ","))
 		return reflect.Value{}, fmt.Errorf(msg)
 	}
-	return reflect.Value{}, fmt.Errorf("type:%v not found", i.Name())
+	return reflect.Value{}, fmt.Errorf("interface type:%v not found", i.Name())
 }
 
 func (gdi *GDIPool) getByName(name string) (result reflect.Value, ok bool) {
