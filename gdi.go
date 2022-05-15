@@ -36,7 +36,7 @@ func NewGDIPool() *GDIPool {
 	return &GDIPool{
 		debug:           true,
 		autoCreate:      true,
-		ignoreInterface: true,
+		ignoreInterface: false,
 		creator:         make(map[reflect.Type]interface{}),
 		creatorLocker:   sync.RWMutex{},
 		typeToValues:    make(map[reflect.Type]reflect.Value),
