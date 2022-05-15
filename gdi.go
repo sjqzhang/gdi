@@ -15,13 +15,14 @@ import (
 var globalGDI *GDIPool
 
 type GDIPool struct {
-	debug         bool
-	autoCreate    bool
-	creator       map[reflect.Type]interface{}
-	creatorLocker sync.RWMutex
-	typeToValues  map[reflect.Type]reflect.Value
-	namesToValues map[string]reflect.Value
-	ttvLocker     sync.RWMutex
+	debug           bool
+	autoCreate      bool
+	ignoreInterface bool
+	creator         map[reflect.Type]interface{}
+	creatorLocker   sync.RWMutex
+	typeToValues    map[reflect.Type]reflect.Value
+	namesToValues   map[string]reflect.Value
+	ttvLocker       sync.RWMutex
 }
 
 var consoleLog = log.New(os.Stdout, "[gdi] ", log.LstdFlags)
@@ -33,19 +34,23 @@ func init() {
 func NewGDIPool() *GDIPool {
 
 	return &GDIPool{
-		debug:         true,
-		autoCreate:    true,
-		creator:       make(map[reflect.Type]interface{}),
-		creatorLocker: sync.RWMutex{},
-		typeToValues:  make(map[reflect.Type]reflect.Value),
-		namesToValues: make(map[string]reflect.Value),
-		ttvLocker:     sync.RWMutex{},
+		debug:           true,
+		autoCreate:      true,
+		ignoreInterface: true,
+		creator:         make(map[reflect.Type]interface{}),
+		creatorLocker:   sync.RWMutex{},
+		typeToValues:    make(map[reflect.Type]reflect.Value),
+		namesToValues:   make(map[string]reflect.Value),
+		ttvLocker:       sync.RWMutex{},
 	}
 }
 
 func Register(funcObjOrPtrs ...interface{}) {
 	globalGDI.Register(funcObjOrPtrs...)
 
+}
+func IgnoreInterfaceInject(isIgnoreInterfaceInject bool) {
+	globalGDI.ignoreInterface = isIgnoreInterfaceInject
 }
 
 func AutoCreate(autoCreate bool) {
@@ -210,15 +215,18 @@ func (gdi *GDIPool) build(v reflect.Value) {
 				gdi.panic(fmt.Sprintf("name:%v type:%v object not found", name, field.Type()))
 			}
 		}
-		if field.Kind() == reflect.Interface {
-			if im, err := gdi.getByInterface(field.Type()); err==nil {
+		if field.Kind() == reflect.Interface && field.IsNil() {
+			if gdi.ignoreInterface {
+				continue
+			}
+			if im, err := gdi.getByInterface(field.Type()); err == nil {
 				field.Set(im)
 				continue
 			} else {
-				if field.Type().String()!="interface {}" {
+				if field.Type().String() != "interface {}" && field.Type().String() != "error" {
 					gdi.panic(err.Error())
 				} else {
-					gdi.warn(fmt.Sprintf("\u001B[1;31mignore type:%v fieldName:%v of %v\u001B[0m",field.Type(),fieldName,v.Type()))
+					gdi.warn(fmt.Sprintf("\u001B[1;31mignore type:%v fieldName:%v of %v\u001B[0m", field.Type(), fieldName, v.Type()))
 					continue
 				}
 			}
@@ -264,7 +272,7 @@ func Debug(isDebug bool) {
 func (gdi *GDIPool) DI(pointer interface{}) error {
 	defer func() {
 		if err := recover(); err != nil {
-			gdi.warn(fmt.Sprintf("%v",err))
+			gdi.warn(fmt.Sprintf("%v", err))
 		}
 	}()
 	var result reflect.Value

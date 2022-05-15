@@ -12,6 +12,7 @@ type AA struct {
 	A *string // `inject:"name:hello"`
 	*CC
 	a interface{} //`inject:"name:hello"`
+	e error
 }
 
 type BB struct {
