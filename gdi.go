@@ -211,11 +211,11 @@ func (gdi *GDIPool) build(v reflect.Value) {
 			}
 		}
 		if field.Kind() == reflect.Interface {
-			if im, ok := gdi.getByInterface(field.Type()); ok {
+			if im, err := gdi.getByInterface(field.Type()); err==nil {
 				field.Set(im)
 				continue
 			} else {
-				panic("not Implements")
+				gdi.panic(err.Error())
 			}
 		}
 		if im, ok := gdi.get(field.Type()); ok {
@@ -374,7 +374,7 @@ func (gdi *GDIPool) get(t reflect.Type) (result reflect.Value, ok bool) {
 	return
 }
 
-func (gdi *GDIPool) getByInterface(i reflect.Type) (value reflect.Value, ok bool) {
+func (gdi *GDIPool) getByInterface(i reflect.Type) (value reflect.Value, err error) {
 	cnt := 0
 	var values []reflect.Value
 	for t, v := range gdi.all() {
@@ -385,17 +385,17 @@ func (gdi *GDIPool) getByInterface(i reflect.Type) (value reflect.Value, ok bool
 		}
 	}
 	if cnt == 1 {
-		return value, true
+		return value, nil
 	}
 	if cnt > 1 {
 		var msgs []string
-		for _,v:=range values {
-			msgs = append(msgs, fmt.Sprintf("%v",v.Type()))
+		for _, v := range values {
+			msgs = append(msgs, fmt.Sprintf("%v", v.Type()))
 		}
-		gdi.panic(fmt.Sprintf("there is one more object impliment %v interface [%v].", i.Name(),strings.Join(msgs,",")))
-		return reflect.Value{}, false
+		msg := fmt.Sprintf("there is one more object impliment %v interface [%v].", i.Name(), strings.Join(msgs, ","))
+		return reflect.Value{}, fmt.Errorf(msg)
 	}
-	return reflect.Value{}, false
+	return reflect.Value{}, fmt.Errorf("type:%v not found", i.Name())
 }
 
 func (gdi *GDIPool) getByName(name string) (result reflect.Value, ok bool) {

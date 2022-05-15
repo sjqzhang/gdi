@@ -9,6 +9,7 @@ import (
 type AA struct {
 	B *BB
 	A *string // `inject:"name:hello"`
+	*CC
 }
 
 type BB struct {
@@ -28,9 +29,15 @@ type DD struct {
 	E *EE
 }
 
+type cc struct {
+	name string
+	age *int
+}
+
 type EE struct {
 	A *AA //`inject:"name:a" json:"a"`
-	*FF 
+	*FF
+	*cc
 }
 
 type FF struct {
@@ -72,13 +79,17 @@ func (d *DD) Add(a, b int) int { //注意：当有多个实现时，存在不确
 
 }
 
-func (d *CC) Add(a, b int) int { //注意：当有多个实现时，存在不确定因索
-
-	return a - b
-
-}
+//func (d *CC) Add(a, b int) int { //注意：当有多个实现时，存在不确定因索
+//
+//	return a - b
+//
+//}
 
 func init() {
+
+	//gdi.Register(&CC{
+	//	Name: "jq",
+	//})
 
 	//gdi.Register(
 	//	&AA{},
@@ -133,9 +144,13 @@ func init() {
 
 func main() {
 
-	gdi.Register(func()(*II,string) {
-		return &II{},"ii"
+	//gdi.Register(func()(*II,string) {
+	//	return &II{},"ii"
+	//
+	//})
 
+	gdi.Register(&cc{
+		name: "xxx",
 	})
 
 	gdi.Init()
@@ -163,8 +178,7 @@ func main() {
 	fmt.Println(a.B.D.E.A.B.C.Name)
 	fmt.Println(a.B.D.E.T.Hl)
 	fmt.Println(*a.B.D.E.Hello=="")
-	////tl.Typelinks()
-	//fmt.Println(*a.A)
-	//gdi.Register()
+	fmt.Println(a.CC.Name)
+	fmt.Println(a.B.e.name)
 
 }
