@@ -121,7 +121,6 @@ type A struct {
 
 func TestAll3(t *testing.T) {
 
-	fmt.Println(colorMsg("xxx",fgYellow))
 
 	Debug(true)
 	AutoCreate(true)

@@ -187,17 +187,29 @@ func (gdi *GDIPool) build(v reflect.Value) {
 		if field.Kind() != reflect.Interface && field.Kind() != reflect.Ptr {
 			continue
 		}
+		fieldName := v.Type().Elem().Field(i).Name
+		readOnly := false
 		if !field.CanSet() {
 			field = reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
+			readOnly = true
 		}
-		name,ok:=gdi.getTagAttr( v.Type().Elem().Field(i),"")
-		if ok && name!="" {
-			if value,ok:=gdi.getByName(name);ok {
+		defer func() {
+			if readOnly {
+				gdi.warn(fmt.Sprintf("inject fieldName:%v of %v", fieldName, v.Type()))
+			} else {
+				gdi.log(fmt.Sprintf("inject fieldName:%v of %v", fieldName, v.Type()))
+			}
+
+		}()
+		name, ok := gdi.getTagAttr(v.Type().Elem().Field(i), "name")
+		if ok && name != "" {
+			if value, ok := gdi.getByName(name); ok {
 				field.Set(value)
 				continue
+			} else {
+				gdi.panic(fmt.Sprintf("name:%v type:%v object not found", name, field.Type()))
 			}
 		}
-		fmt.Println(fmt.Sprintf("type:%v", field.Type()))
 		if field.Kind() == reflect.Interface {
 			if im, ok := gdi.getByInterface(field.Type()); ok {
 				field.Set(im)
@@ -212,8 +224,7 @@ func (gdi *GDIPool) build(v reflect.Value) {
 			if gdi.autoCreate {
 				value := reflect.New(field.Type().Elem())
 				field.Set(value)
-				gdi.log(fmt.Sprintf("autoCreate %v",field.Type()))
-				fmt.Println(fmt.Sprintf("%v", field.Type()))
+				gdi.warn(fmt.Sprintf("autoCreate type:%v fieldName:%v of %v", field.Type(), fieldName, v.Type()))
 				gdi.set(field.Type(), value.Interface())
 				gdi.build(value)
 			}
@@ -344,29 +355,12 @@ func GetPtrUnExportFiled(s interface{}, filed string) reflect.Value {
 	return reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem()
 }
 
-func GetPtrUnExportFiledByIndex(s interface{}, index int) reflect.Value {
-	v := reflect.ValueOf(s).Elem().Field(index)
-	// 必须要调用 Elem()
-	return reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem()
-}
-
-func SetPtrUnExportFiledByIndex(s interface{}, index int, val interface{}) error {
-	v := GetPtrUnExportFiledByIndex(s, index)
-	rv := reflect.ValueOf(val)
-	if v.Kind() != v.Kind() {
-		return fmt.Errorf("invalid kind, expected kind: %v, got kind:%v", v.Kind(), rv.Kind())
-	}
-	v.Set(rv)
-	return nil
-}
-
 func SetPtrUnExportFiled(s interface{}, filed string, val interface{}) error {
 	v := GetPtrUnExportFiled(s, filed)
 	rv := reflect.ValueOf(val)
 	if v.Kind() != v.Kind() {
 		return fmt.Errorf("invalid kind, expected kind: %v, got kind:%v", v.Kind(), rv.Kind())
 	}
-
 	v.Set(rv)
 	return nil
 }
@@ -379,6 +373,11 @@ func Debug(isDebug bool) {
 }
 
 func (gdi *GDIPool) DI(pointer interface{}) error {
+	defer func() {
+		if err := recover(); err != nil {
+			gdi.warn(err.(error).Error())
+		}
+	}()
 	var result reflect.Value
 	ftype := reflect.TypeOf(pointer)
 	if ftype.Kind() != reflect.Ptr {
@@ -466,7 +465,6 @@ func (gdi *GDIPool) GetWithCheck(t interface{}) (value interface{}, ok bool) {
 }
 
 func (gdi *GDIPool) getTagAttr(f reflect.StructField, tagAttr string) (string, bool) {
-
 	if tag, ok := f.Tag.Lookup("inject"); ok {
 		m := make(map[string]string)
 		tags := strings.Split(tag, ";")
@@ -510,7 +508,9 @@ func (gdi *GDIPool) getByName(name string) (result reflect.Value, ok bool) {
 
 func (gdi *GDIPool) log(msg string) {
 	if gdi.debug {
-		consoleLog.Println(msg)
+		colorGreen := "\033[1;32m"
+		colorNormal := "\033[0m"
+		consoleLog.Println(colorGreen + msg + colorNormal)
 	}
 }
 func (gdi *GDIPool) warn(msg string) {
@@ -611,129 +611,4 @@ func (gdi *GDIPool) parsePoolFunc(f interface{}) (outType reflect.Type, e error)
 		return
 	}
 	return
-}
-
-type HandlerFactory struct {
-	process map[string]*methodInfo
-	lock    *sync.Mutex
-}
-
-type methodInfo struct {
-	mt reflect.Method
-	mv reflect.Value
-}
-
-func NewHandlerFactory() *HandlerFactory {
-	return &HandlerFactory{
-		process: make(map[string]*methodInfo, 100),
-		lock:    &sync.Mutex{},
-	}
-}
-
-func (p *HandlerFactory) Call(name string, args ...interface{}) (interface{}, error) {
-	if m, ok := p.process[name]; ok {
-		method := m.mt
-		t1 := method.Type
-
-		if len(args) != t1.NumIn()-1 {
-			return nil, fmt.Errorf("The number of parameters is different!")
-		}
-		var vals []reflect.Value
-		for i := 0; i < t1.NumIn(); i++ {
-			for j := 0; j < len(args); j++ {
-				if reflect.TypeOf(args[j]) == t1.In(i) {
-					vals = append(vals, reflect.ValueOf(args[j]))
-				}
-			}
-		}
-		values := m.mv.Call(vals)
-		if len(values) == 0 {
-			return nil, nil
-		}
-		if last := values[len(values)-1]; last.Type().Implements(reflect.TypeOf((*error)(nil)).Elem()) {
-			var er error
-			if last.Interface() != nil {
-				er = last.Interface().(error)
-			}
-			if err, _ := last.Interface().(error); err != nil {
-				return nil, er
-			}
-			if len(values) == 1 {
-				return nil, er
-			}
-			if len(values) >= 2 {
-				return values[0].Interface(), er
-			}
-		} else {
-			if len(values) == 1 {
-				return values[0].Interface(), nil
-			}
-		}
-		return values[len(values)-1].Interface(), nil
-	} else {
-		return nil, fmt.Errorf("%s not found", name)
-	}
-
-}
-
-type Error struct {
-	msg string
-}
-
-func (g *Error) Error() string {
-	return g.msg
-}
-
-func NewError(msg string) *Error {
-	return &Error{
-		msg: msg,
-	}
-}
-
-func (p *HandlerFactory) AddHandler(v interface{}) {
-	t1 := reflect.TypeOf(v)
-	v1 := reflect.ValueOf(v)
-	if v1.IsNil() {
-		panic("传递的对象不能为空！")
-	}
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	if t1.Kind() == reflect.Ptr && t1.Elem().Kind() == reflect.Struct {
-		for i := 0; i < t1.NumMethod(); i++ {
-			pt := t1.Method(i).Type
-			ok := false
-			//if pt.NumOut() > 1 {
-			//	panic("函数的返回值只能是一个，并且是error类型，如需返回值需要参数中传递对象指针作为返回用途")
-			//}
-			if pt.NumOut() > 0 {
-				if !pt.Out(pt.NumOut() - 1).Implements(reflect.TypeOf((*error)(nil)).Elem()) {
-					panic("函数的返回值只能是error类型，如需返回值需要参数中传递对象指针作为返回用途")
-				}
-			}
-			for j := 1; j < pt.NumIn(); j++ {
-				if pt.In(j).Kind() == reflect.Ptr && pt.In(j).Elem().Kind() == reflect.Struct {
-					ok = true
-				}
-				if pt.NumIn() > 2 {
-					for k := j + 1; k < pt.NumIn(); k++ {
-						if pt.In(j).Kind() == pt.In(k).Kind() {
-							panic("函数中不能带有相同类型的参数，如有同类型的参数需要进行类型封装，再进行传递")
-						}
-					}
-				}
-
-			}
-			if !ok {
-				//panic("你的函数参数中必须带有一个结构体的指针用于返回值！")
-			}
-			info := &methodInfo{
-				mt: t1.Method(i),
-				mv: v1.Method(i),
-			}
-			p.process[t1.Method(i).Name] = info
-		}
-	} else {
-		panic("注册的Handler对象必须是struct指针")
-	}
-
 }
