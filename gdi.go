@@ -183,6 +183,50 @@ func (gdi *GDIPool) build(v reflect.Value) {
 		return
 	}
 	for i := 0; i < v.Elem().NumField(); i++ {
+		field := v.Elem().Field(i)
+		if field.Kind() != reflect.Interface && field.Kind() != reflect.Ptr {
+			continue
+		}
+		if !field.CanSet() {
+			field = reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
+		}
+		name,ok:=gdi.getTagAttr( v.Type().Elem().Field(i),"")
+		if ok && name!="" {
+			if value,ok:=gdi.getByName(name);ok {
+				field.Set(value)
+				continue
+			}
+		}
+		fmt.Println(fmt.Sprintf("type:%v", field.Type()))
+		if field.Kind() == reflect.Interface {
+			if im, ok := gdi.getByInterface(field.Type()); ok {
+				field.Set(im)
+				continue
+			} else {
+				panic("not Implements")
+			}
+		}
+		if im, ok := gdi.get(field.Type()); ok {
+			field.Set(im)
+		} else {
+			if gdi.autoCreate {
+				value := reflect.New(field.Type().Elem())
+				field.Set(value)
+				gdi.log(fmt.Sprintf("autoCreate %v",field.Type()))
+				fmt.Println(fmt.Sprintf("%v", field.Type()))
+				gdi.set(field.Type(), value.Interface())
+				gdi.build(value)
+			}
+		}
+
+	}
+}
+
+func (gdi *GDIPool) build2(v reflect.Value) {
+	if v.Elem().Kind() != reflect.Struct {
+		return
+	}
+	for i := 0; i < v.Elem().NumField(); i++ {
 		if (v.Elem().Field(i).Kind() == reflect.Ptr || v.Elem().Field(i).Kind() == reflect.Interface) && v.Elem().Field(i).IsNil() && v.Elem().Field(i).CanSet() {
 			ftype := reflect.TypeOf(v.Elem().Field(i).Interface())
 			fieldName := reflect.TypeOf(v.Elem().Interface()).Field(i).Name
@@ -221,6 +265,10 @@ func (gdi *GDIPool) build(v reflect.Value) {
 					} else {
 						gdi.panic(fmt.Sprintf("the name of '%v' not found,please register first", name))
 					}
+				}
+				if ftype.Elem().Kind() == reflect.String {
+					s := ""
+					v.Elem().Field(i).Set(reflect.ValueOf(&s))
 				}
 				if ftype.Elem().Kind() != reflect.Struct {
 					gdi.warn(fmt.Sprintf("(WARNNING) inject %v ignore of %v,type just support Struct ", ftype, v.Type()))
@@ -443,6 +491,16 @@ func (gdi *GDIPool) get(t reflect.Type) (result reflect.Value, ok bool) {
 	result, ok = gdi.typeToValues[t]
 	return
 }
+
+func (gdi *GDIPool) getByInterface(i reflect.Type) (reflect.Value, bool) {
+	for t, v := range gdi.all() {
+		if t.Implements(i) {
+			return v, true
+		}
+	}
+	return reflect.Value{}, false
+}
+
 func (gdi *GDIPool) getByName(name string) (result reflect.Value, ok bool) {
 	gdi.ttvLocker.RLock()
 	defer gdi.ttvLocker.RUnlock()
@@ -456,14 +514,18 @@ func (gdi *GDIPool) log(msg string) {
 	}
 }
 func (gdi *GDIPool) warn(msg string) {
-	consoleLog.Println("WARNNING: " + msg)
+	colorYellow := "\033[1;33m"
+	colorNormal := "\033[0m"
+	consoleLog.Println(fmt.Sprintf("%v%v%v", colorYellow, "WARNNING: "+msg, colorNormal))
 }
 
 func (gdi *GDIPool) panic(msg string) {
 	var buf [2 << 10]byte
-	consoleLog.Println("PANIC:  注意查看以下提示（WARNNING:Pay attention to the following tips）")
+	colorRed := "\033[1;31m"
+	colorNormal := "\033[0m"
+	consoleLog.Println(colorRed + "PANIC:  注意查看以下提示（WARNNING:Pay attention to the following tips）" + colorNormal)
 	consoleLog.Println(string(buf[:runtime.Stack(buf[:], true)]))
-	consoleLog.Fatal(msg)
+	consoleLog.Fatal(colorRed + msg + colorNormal)
 
 }
 
@@ -487,7 +549,6 @@ func (gdi *GDIPool) create(fun interface{}) []reflect.Value {
 }
 
 func (gdi *GDIPool) set(outType reflect.Type, f interface{}) {
-
 	if f != nil {
 		if reflect.TypeOf(f).Kind() == reflect.Func {
 			vals := gdi.create(f)

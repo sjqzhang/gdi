@@ -121,6 +121,8 @@ type A struct {
 
 func TestAll3(t *testing.T) {
 
+	fmt.Println(colorMsg("xxx",fgYellow))
+
 	Debug(true)
 	AutoCreate(true)
 
@@ -134,6 +136,8 @@ func TestAll3(t *testing.T) {
 	a.p.addr.Email="xxx"
 
 	fmt.Println(a.p.addr.Email)
+
+
 
 
 }

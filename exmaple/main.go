@@ -8,7 +8,7 @@ import (
 
 type AA struct {
 	B *BB
-	A *string `inject:"name:hello"`
+	A *string  `inject:"name:hello"`
 }
 
 type BB struct {
@@ -23,19 +23,19 @@ type CC struct {
 
 type DD struct {
 	C *CC
-	I IIer `inject:"name:ii"` //注意当为接口时，这里不能是指针，且有多实现时，目前只能返回第一个实现
+	I IIer //`inject:"name:ii"` //注意当为接口时，这里不能是指针，且有多实现时，目前只能返回第一个实现
 	E *EE
 }
 
 type EE struct {
-	A *AA `inject:"name:a" json:"a"`
+	A *AA //`inject:"name:a" json:"a"`
 	*FF 
 }
 
 type FF struct {
 	Addr string
-	T *TT `inject:"name:ttt"`
-	Hello *string  `inject:"name:hello"`
+	T *TT //`inject:"name:ttt"`
+	Hello *string // `inject:"name:hello"`
 }
 
 type TT struct {
@@ -47,8 +47,8 @@ type IIer interface {
 }
 
 type II struct {
-	A string `inject:"name:hello"`
-	Home string `inject:"name:home"`
+	A string //`inject:"name:hello"`
+	Home string // `inject:"name:home"`
 }
 
 func (ii *II) Add(a, b int) int {
@@ -73,58 +73,72 @@ func (d *DD) Add(a, b int) int { //注意：当有多个实现时，存在不确
 
 func init() {
 
-	gdi.Register(
-		&AA{},
-		&BB{},
-		func() *DD {
-			return &DD{}
-		},
-	) //可以一次注册多个对象
-	//gdi.Register(&BB{})
-	//gdi.Register(&DD{})
-	//gdi.Register(&CC{})
-	gdi.Register(func() (*II,string){
-		return &II{
-
-		},"ii"
-	}) //简单对象
-	//gdi.Register(&FF{
-	//	Addr: "SZ",
+	//gdi.Register(
+	//	&AA{},
+	//	&BB{},
+	//	func() *DD {
+	//		return &DD{}
+	//	},
+	//) //可以一次注册多个对象
+	////gdi.Register(&BB{})
+	////gdi.Register(&DD{})
+	////gdi.Register(&CC{})
+	//gdi.Register(func() (*II,string){
+	//	return &II{
+	//
+	//	},"ii"
 	//}) //简单对象
-
-	gdi.Register(func() *CC { //复杂对象
-
-		age := func() int { //可进行复杂构造，这只是示例
-			return 10 + 4
-		}
-		return &CC{
-			Name: "hello world",
-			Age:  age(),
-		}
-	})
-
-	gdi.Register(func() (*EE, error) { //带错误的注册
-
-		return &EE{}, nil
-	})
-
-	gdi.Register(func() (*TT,string) {
-
-		return &TT{
-			Hl: "aaaa",
-		},"ttt"
-	})
-
-	gdi.Register(func() (*string,string) {
-
-		var name string
-		name="xsdasdfaf"
-		return &name,"hello"
-	})
+	////gdi.Register(&FF{
+	////	Addr: "SZ",
+	////}) //简单对象
+	//
+	//gdi.Register(func() *CC { //复杂对象
+	//
+	//	age := func() int { //可进行复杂构造，这只是示例
+	//		return 10 + 4
+	//	}
+	//	return &CC{
+	//		Name: "hello world",
+	//		Age:  age(),
+	//	}
+	//})
+	//
+	//gdi.Register(func() (*EE, error) { //带错误的注册
+	//
+	//	return &EE{}, nil
+	//})
+	//
+	//gdi.Register(func() (*TT,string) {
+	//
+	//	return &TT{
+	//		Hl: "aaaa",
+	//	},"ttt"
+	//})
+	//
+	//gdi.Register(func() (*string,string) {
+	//
+	//	var name string
+	//	name="xsdasdfaf"
+	//	return &name,"hello"
+	//})
 
 }
 
 func main() {
+	gdi.AutoCreate(true)
+	gdi.Register(&AA{})
+	//gdi.Register(&BB{})
+	gdi.Init()
+
+	type X struct {
+		a *AA
+		b *BB
+	}
+	var x X
+	gdi.DI(&x)
+
+
+	fmt.Println(*x.a.A)
 	gdi.Debug(true)      //显示注入信息，方便排错，需在gdi.Init()方法之前调用
 	gdi.AutoCreate(true) //开启自动注入
 	gdi.Init()           //使用前必须先调用，当出现无解注入对象时会panic,避免运行时出现空指针
@@ -138,10 +152,12 @@ func main() {
 	fmt.Println(a.B.D.E.A.B.D.E.A.B.D.E.A.B.C.Age)
 	fmt.Println(a.B.D.E.A.B.C.Name)
 	fmt.Println(a.B.D.E.T.Hl)
-	fmt.Println(*a.B.D.E.Hello)
-	//tl.Typelinks()
-	fmt.Println(*a.A)
-	gdi.Register()
+	fmt.Println(*a.B.D.E.Hello=="")
+	////tl.Typelinks()
+	//fmt.Println(*a.A)
+	//gdi.Register()
+
+
 
 
 	gdi.NewHandlerFactory()
