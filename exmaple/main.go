@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/sjqzhang/gdi"
+
 	//"github.com/sjqzhang/gdi/tl"
 )
 
@@ -10,6 +11,7 @@ type AA struct {
 	B *BB
 	A *string // `inject:"name:hello"`
 	*CC
+	a interface{} //`inject:"name:hello"`
 }
 
 type BB struct {
@@ -145,40 +147,52 @@ func init() {
 func main() {
 
 	//gdi.Register(func()(*II,string) {
-	//	return &II{},"ii"
+	//	return &II{
+	//		Home: "zh",
+	//	},"hello"
 	//
 	//})
-
-	gdi.Register(&cc{
-		name: "xxx",
-	})
+	//
+	//gdi.Register(&cc{
+	//	name: "xxx",
+	//})
+	//
+	//gdi.Init()
+	//
+	//type X struct {
+	//	a *AA
+	//	b *BB
+	//}
+	//var x X
+	//gdi.DI(&x)
+	//
+	//
+	//fmt.Println(*x.a.A)
+	//gdi.Debug(true)      //显示注入信息，方便排错，需在gdi.Init()方法之前调用
+	//gdi.AutoCreate(true) //开启自动注入
+	//gdi.Init()           //使用前必须先调用，当出现无解注入对象时会panic,避免运行时出现空指针
+	//var a *AA
+	//a = gdi.Get(a).(*AA) //说明，这里可以直接进行类型转换，不会出现空指针，当出现空指针时，gdi.Init()就会panic
+	//fmt.Println(a.B.C.Name)
+	//fmt.Println(a.B.D.C.Age)
+	//fmt.Println(a.B.D.Say("zhangsan"))
+	//
+	//fmt.Println(a.B.D.I.Add(2, 3))
+	//fmt.Println(a.B.D.E.A.B.D.E.A.B.D.E.A.B.C.Age)
+	//fmt.Println(a.B.D.E.A.B.C.Name)
+	//fmt.Println(a.B.D.E.T.Hl)
+	//fmt.Println(*a.B.D.E.Hello=="")
+	//fmt.Println(a.CC.Name)
+	//fmt.Println(a.B.e.name)
+	//fmt.Println(a.a.(*II).Home)
 
 	gdi.Init()
 
-	type X struct {
-		a *AA
-		b *BB
-	}
-	var x X
-	gdi.DI(&x)
+	var a AA
+
+	gdi.DI(&a)
 
 
-	fmt.Println(*x.a.A)
-	gdi.Debug(true)      //显示注入信息，方便排错，需在gdi.Init()方法之前调用
-	gdi.AutoCreate(true) //开启自动注入
-	gdi.Init()           //使用前必须先调用，当出现无解注入对象时会panic,避免运行时出现空指针
-	var a *AA
-	a = gdi.Get(a).(*AA) //说明，这里可以直接进行类型转换，不会出现空指针，当出现空指针时，gdi.Init()就会panic
-	fmt.Println(a.B.C.Name)
-	fmt.Println(a.B.D.C.Age)
-	fmt.Println(a.B.D.Say("zhangsan"))
-
-	fmt.Println(a.B.D.I.Add(2, 3))
-	fmt.Println(a.B.D.E.A.B.D.E.A.B.D.E.A.B.C.Age)
-	fmt.Println(a.B.D.E.A.B.C.Name)
-	fmt.Println(a.B.D.E.T.Hl)
-	fmt.Println(*a.B.D.E.Hello=="")
-	fmt.Println(a.CC.Name)
-	fmt.Println(a.B.e.name)
+	fmt.Println(a.B.D.C.Name)
 
 }

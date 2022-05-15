@@ -215,7 +215,12 @@ func (gdi *GDIPool) build(v reflect.Value) {
 				field.Set(im)
 				continue
 			} else {
-				gdi.panic(err.Error())
+				if field.Type().String()!="interface {}" {
+					gdi.panic(err.Error())
+				} else {
+					gdi.warn(fmt.Sprintf("\u001B[1;31mignore type:%v fieldName:%v of %v\u001B[0m",field.Type(),fieldName,v.Type()))
+					continue
+				}
 			}
 		}
 		if im, ok := gdi.get(field.Type()); ok {
@@ -259,7 +264,7 @@ func Debug(isDebug bool) {
 func (gdi *GDIPool) DI(pointer interface{}) error {
 	defer func() {
 		if err := recover(); err != nil {
-			gdi.warn(err.(error).Error())
+			gdi.warn(fmt.Sprintf("%v",err))
 		}
 	}()
 	var result reflect.Value
