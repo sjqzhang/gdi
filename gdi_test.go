@@ -120,11 +120,7 @@ type A struct {
 }
 
 func TestAll3(t *testing.T) {
-
-
 	Debug(true)
-	AutoCreate(true)
-
 	Register(&Person{Name: "hello world"})
 
 	Init()

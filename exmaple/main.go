@@ -188,6 +188,7 @@ func main() {
 	//fmt.Println(a.B.e.name)
 	//fmt.Println(a.a.(*II).Home)
 
+	gdi.ScanPkgPaths("main")
 	gdi.Init()
 
 	var a AA

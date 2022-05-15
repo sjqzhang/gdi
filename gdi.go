@@ -3,9 +3,11 @@ package gdi
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"reflect"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -16,7 +18,7 @@ var globalGDI *GDIPool
 
 type GDIPool struct {
 	debug           bool
-	autoCreate      bool
+	scanPkgPaths    []string
 	ignoreInterface bool
 	creator         map[reflect.Type]interface{}
 	creatorLocker   sync.RWMutex
@@ -32,10 +34,19 @@ func init() {
 }
 
 func NewGDIPool() *GDIPool {
-
+	dir, _ := os.Getwd()
+	mod, err := ioutil.ReadFile(dir + "/" + "go.mod")
+	modName := "main"
+	if err == nil {
+		exp := regexp.MustCompile(`module\s+([^\n]+?)[\n\r]`)
+		pkgPath := exp.FindAllStringSubmatch(string(mod), -1)
+		if len(pkgPath) == 1 && len(pkgPath[0]) == 2 {
+			modName = pkgPath[0][1]
+		}
+	}
 	return &GDIPool{
 		debug:           true,
-		autoCreate:      false,
+		scanPkgPaths:    []string{modName},
 		ignoreInterface: false,
 		creator:         make(map[reflect.Type]interface{}),
 		creatorLocker:   sync.RWMutex{},
@@ -53,11 +64,8 @@ func IgnoreInterfaceInject(isIgnoreInterfaceInject bool) {
 	globalGDI.ignoreInterface = isIgnoreInterfaceInject
 }
 
-func AutoCreate(autoCreate bool) {
-	if autoCreate {
-		globalGDI.Debug(autoCreate)
-	}
-	globalGDI.AutoCreate(autoCreate)
+func ScanPkgPaths(scanPaths ...string) {
+	globalGDI.scanPkgPaths = scanPaths
 }
 
 func Get(t interface{}) (value interface{}) {
@@ -80,8 +88,8 @@ func Init() {
 	globalGDI.Init()
 }
 
-func (gdi *GDIPool) AutoCreate(autoCreate bool) {
-	gdi.autoCreate = autoCreate
+func (gdi *GDIPool) ScanPkgPaths(scanPaths ...string) {
+	gdi.scanPkgPaths = append(gdi.scanPkgPaths, scanPaths...)
 }
 
 func (gdi *GDIPool) Register(funcObjOrPtrs ...interface{}) {
@@ -189,8 +197,7 @@ func (gdi *GDIPool) build(v reflect.Value) {
 	}
 	for i := 0; i < v.Elem().NumField(); i++ {
 		field := v.Elem().Field(i)
-		packName:=v.Type().Elem().PkgPath()
-		gdi.log(packName)
+		packName := v.Type().Elem().PkgPath()
 		if field.Kind() != reflect.Interface && field.Kind() != reflect.Ptr {
 			continue
 		}
@@ -217,7 +224,7 @@ func (gdi *GDIPool) build(v reflect.Value) {
 				gdi.panic(fmt.Sprintf("name:%v type:%v object not found", name, field.Type()))
 			}
 		}
-		if field.Kind() == reflect.Interface  {
+		if field.Kind() == reflect.Interface {
 			if !field.IsNil() {
 				continue
 			}
@@ -239,7 +246,10 @@ func (gdi *GDIPool) build(v reflect.Value) {
 		if im, ok := gdi.get(field.Type()); ok {
 			field.Set(im)
 		} else {
-			if gdi.autoCreate {
+			for _, pkg := range gdi.scanPkgPaths {
+				if pkg != packName {
+					continue
+				}
 				value := reflect.New(field.Type().Elem())
 				field.Set(value)
 				gdi.warn(fmt.Sprintf("autoCreate type:%v fieldName:%v of %v", field.Type(), fieldName, v.Type()))
