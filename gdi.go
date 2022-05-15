@@ -34,7 +34,7 @@ func NewGDIPool() *GDIPool {
 
 	return &GDIPool{
 		debug:         true,
-		autoCreate:    false,
+		autoCreate:    true,
 		creator:       make(map[reflect.Type]interface{}),
 		creatorLocker: sync.RWMutex{},
 		typeToValues:  make(map[reflect.Type]reflect.Value),
@@ -374,11 +374,26 @@ func (gdi *GDIPool) get(t reflect.Type) (result reflect.Value, ok bool) {
 	return
 }
 
-func (gdi *GDIPool) getByInterface(i reflect.Type) (reflect.Value, bool) {
+func (gdi *GDIPool) getByInterface(i reflect.Type) (value reflect.Value, ok bool) {
+	cnt := 0
+	var values []reflect.Value
 	for t, v := range gdi.all() {
 		if t.Implements(i) {
-			return v, true
+			cnt++
+			value = v
+			values = append(values, v)
 		}
+	}
+	if cnt == 1 {
+		return value, true
+	}
+	if cnt > 1 {
+		var msgs []string
+		for _,v:=range values {
+			msgs = append(msgs, fmt.Sprintf("%v",v.Type()))
+		}
+		gdi.panic(fmt.Sprintf("there is one more object impliment %v interface [%v].", i.Name(),strings.Join(msgs,",")))
+		return reflect.Value{}, false
 	}
 	return reflect.Value{}, false
 }
