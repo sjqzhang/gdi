@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"reflect"
 	"runtime"
 	"strings"
@@ -22,6 +23,8 @@ type GDIPool struct {
 	namesToValues map[string]reflect.Value
 	ttvLocker     sync.RWMutex
 }
+
+var consoleLog = log.New(os.Stdout, "[gdi] ", log.LstdFlags)
 
 func init() {
 	globalGDI = NewGDIPool()
@@ -305,7 +308,6 @@ func SetPtrUnExportFiledByIndex(s interface{}, index int, val interface{}) error
 	if v.Kind() != v.Kind() {
 		return fmt.Errorf("invalid kind, expected kind: %v, got kind:%v", v.Kind(), rv.Kind())
 	}
-
 	v.Set(rv)
 	return nil
 }
@@ -450,18 +452,18 @@ func (gdi *GDIPool) getByName(name string) (result reflect.Value, ok bool) {
 
 func (gdi *GDIPool) log(msg string) {
 	if gdi.debug {
-		log.Println(msg)
+		consoleLog.Println(msg)
 	}
 }
 func (gdi *GDIPool) warn(msg string) {
-	log.Println("WARNNING: " + msg)
+	consoleLog.Println("WARNNING: " + msg)
 }
 
 func (gdi *GDIPool) panic(msg string) {
 	var buf [2 << 10]byte
-	log.Println("PANIC:  注意查看以下提示（WARNNING:Pay attention to the following tips）")
-	log.Println(string(buf[:runtime.Stack(buf[:], true)]))
-	log.Fatal(msg)
+	consoleLog.Println("PANIC:  注意查看以下提示（WARNNING:Pay attention to the following tips）")
+	consoleLog.Println(string(buf[:runtime.Stack(buf[:], true)]))
+	consoleLog.Fatal(msg)
 
 }
 
@@ -495,9 +497,9 @@ func (gdi *GDIPool) set(outType reflect.Type, f interface{}) {
 				if _, ok := gdi.namesToValues[vals[1].Interface().(string)]; ok {
 					gdi.panic(fmt.Sprintf("double register name: '%v'", vals[1].Interface().(string)))
 				}
-				name:=vals[1].Interface().(string)
+				name := vals[1].Interface().(string)
 				gdi.namesToValues[name] = vals[0]
-				gdi.log(fmt.Sprintf("register by name, name:%v type:%v success", name,vals[0].Type()))
+				gdi.log(fmt.Sprintf("register by name, name:%v type:%v success", name, vals[0].Type()))
 				return
 			} else if len(vals) == 2 && vals[1].Type().Implements(reflect.TypeOf((*error)(nil)).Elem()) {
 				if vals[1].Interface() != nil {
