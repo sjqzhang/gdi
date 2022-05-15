@@ -24,7 +24,7 @@ type CC struct {
 
 type DD struct {
 	C *CC
-	I IIer `inject:"name:ii"` //注意当为接口时，这里不能是指针，且有多实现时，目前只能返回第一个实现
+	I IIer //`inject:"name:ii"` //注意当为接口时，这里不能是指针，且有多实现时，目前只能返回第一个实现
 	E *EE
 }
 
@@ -72,63 +72,72 @@ func (d *DD) Add(a, b int) int { //注意：当有多个实现时，存在不确
 
 }
 
+func (d *CC) Add(a, b int) int { //注意：当有多个实现时，存在不确定因索
+
+	return a - b
+
+}
+
 func init() {
 
-	gdi.Register(
-		&AA{},
-		&BB{},
-		func() *DD {
-			return &DD{}
-		},
-	) //可以一次注册多个对象
-	//gdi.Register(&BB{})
-	//gdi.Register(&DD{})
-	//gdi.Register(&CC{})
-	gdi.Register(func() (*II,string){
-		return &II{
-
-		},"ii"
-	}) //简单对象
-	//gdi.Register(&FF{
-	//	Addr: "SZ",
+	//gdi.Register(
+	//	&AA{},
+	//	&BB{},
+	//	func() *DD {
+	//		return &DD{}
+	//	},
+	//) //可以一次注册多个对象
+	////gdi.Register(&BB{})
+	////gdi.Register(&DD{})
+	////gdi.Register(&CC{})
+	//gdi.Register(func() (*II,string){
+	//	return &II{
+	//
+	//	},"ii"
 	//}) //简单对象
-
-	gdi.Register(func() *CC { //复杂对象
-
-		age := func() int { //可进行复杂构造，这只是示例
-			return 10 + 4
-		}
-		return &CC{
-			Name: "hello world",
-			Age:  age(),
-		}
-	})
-
-	gdi.Register(func() (*EE, error) { //带错误的注册
-
-		return &EE{}, nil
-	})
-
-	gdi.Register(func() (*TT,string) {
-
-		return &TT{
-			Hl: "aaaa",
-		},"ttt"
-	})
-
-	gdi.Register(func() (*string,string) {
-
-		var name string
-		name="xsdasdfaf"
-		return &name,"hello"
-	})
+	////gdi.Register(&FF{
+	////	Addr: "SZ",
+	////}) //简单对象
+	//
+	//gdi.Register(func() *CC { //复杂对象
+	//
+	//	age := func() int { //可进行复杂构造，这只是示例
+	//		return 10 + 4
+	//	}
+	//	return &CC{
+	//		Name: "hello world",
+	//		Age:  age(),
+	//	}
+	//})
+	//
+	//gdi.Register(func() (*EE, error) { //带错误的注册
+	//
+	//	return &EE{}, nil
+	//})
+	//
+	//gdi.Register(func() (*TT,string) {
+	//
+	//	return &TT{
+	//		Hl: "aaaa",
+	//	},"ttt"
+	//})
+	//
+	//gdi.Register(func() (*string,string) {
+	//
+	//	var name string
+	//	name="xsdasdfaf"
+	//	return &name,"hello"
+	//})
 
 }
 
 func main() {
-	gdi.AutoCreate(true)
-	//gdi.Register(&AA{})
-	//gdi.Register(&BB{})
+
+	gdi.Register(func()(*II,string) {
+		return &II{},"ii"
+
+	})
+
 	gdi.Init()
 
 	type X struct {
@@ -157,10 +166,5 @@ func main() {
 	////tl.Typelinks()
 	//fmt.Println(*a.A)
 	//gdi.Register()
-
-
-
-
-	gdi.NewHandlerFactory()
 
 }
