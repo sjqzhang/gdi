@@ -89,8 +89,6 @@ func (d *DD) Add(a, b int) int { //注意：当有多个实现时，存在不确
 //}
 
 func init() {
-
-	gdi.IgnoreInterfaceInject(false)
 	//gdi.Register(&CC{
 	//	Name: "jq",
 	//})
@@ -188,7 +186,6 @@ func main() {
 	//fmt.Println(a.B.e.name)
 	//fmt.Println(a.a.(*II).Home)
 
-	gdi.ScanPkgPaths("main")
 	gdi.Init()
 
 	var a AA
