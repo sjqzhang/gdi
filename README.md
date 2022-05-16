@@ -62,7 +62,7 @@ type DD struct {
 }
 
 type EE struct {
-	A *AA `inject:"name:a" json:"a"`
+	A *AA //`inject:"name:a" json:"a"`
 	*FF
 }
 
@@ -160,8 +160,6 @@ func init() {
 
 func main() {
 	gdi.Debug(true)      //显示注入信息，方便排错，需在gdi.Init()方法之前调用
-	gdi.ScanPkgPaths("github.com/sjqzhang/gdi") //在此包下的对象会自动创建
-	gdi.IgnoreInterfaceInject(false) //是否忽略接口类型注入
 	gdi.Init()           //使用前必须先调用，当出现无解注入对象时会panic,避免运行时出现空指针
 	var a *AA
 	a = gdi.Get(a).(*AA) //说明，这里可以直接进行类型转换，不会出现空指针，当出现空指针时，gdi.Init()就会panic
