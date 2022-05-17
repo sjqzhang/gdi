@@ -263,9 +263,9 @@ func (gdi *GDIPool) build(v reflect.Value) {
 		}
 		defer func() {
 			if readOnly {
-				gdi.warn(fmt.Sprintf("inject fieldName:%v of %v pkgPath:%v", fieldName, v.Type(), pkgPath))
+				gdi.warn(fmt.Sprintf("inject fieldName:%v->%v of %v pkgPath:%v", fieldName,field.Type(), v.Type(), pkgPath))
 			} else {
-				gdi.log(fmt.Sprintf("inject fieldName:%v of %v pkgPath:%v", fieldName, v.Type(), pkgPath))
+				gdi.log(fmt.Sprintf("inject fieldName:%v->%v of %v pkgPath:%v", fieldName,field.Type(), v.Type(), pkgPath))
 			}
 
 		}()
@@ -300,7 +300,7 @@ func (gdi *GDIPool) build(v reflect.Value) {
 			if gdi.autoCreate {
 				value := reflect.New(field.Type().Elem())
 				field.Set(value)
-				gdi.warn(fmt.Sprintf("autoCreate type:%v fieldName:%v of %v", field.Type(), fieldName, v.Type()))
+				gdi.warn(fmt.Sprintf("\u001B[1;35mautoCreate\u001B[0m type:%v fieldName:%v of %v", field.Type(), fieldName, v.Type()))
 				gdi.set(field.Type(), value.Interface())
 				gdi.build(value)
 			}
@@ -308,21 +308,41 @@ func (gdi *GDIPool) build(v reflect.Value) {
 
 	}
 }
-// GetPtrUnExportFiled 获取没有导出的字段属性
-func GetPtrUnExportFiled(s interface{}, filed string) reflect.Value {
-	v := reflect.ValueOf(s).Elem().FieldByName(filed)
-	// 必须要调用 Elem()
-	return reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem()
-}
-// SetPtrUnExportFiled 设置没有导出的字段属性
-func SetPtrUnExportFiled(s interface{}, filed string, val interface{}) error {
-	v := GetPtrUnExportFiled(s, filed)
-	rv := reflect.ValueOf(val)
-	if v.Kind() != v.Kind() {
-		return fmt.Errorf("invalid kind, expected kind: %v, got kind:%v", v.Kind(), rv.Kind())
+func SetStructPtrUnExportedStrField(source interface{}, fieldName string, fieldVal interface{}) (err error) {
+	v := GetStructPtrUnExportedField(source, fieldName)
+	rv := reflect.ValueOf(fieldVal)
+	if v.Kind() != rv.Kind() {
+		return fmt.Errorf("invalid kind: expected kind %v, got kind: %v", v.Kind(), rv.Kind())
 	}
+
 	v.Set(rv)
 	return nil
+}
+
+func SetStructUnExportedStrField(source interface{}, fieldName string, fieldVal interface{}) (addressableSourceCopy reflect.Value, err error) {
+	var accessableField reflect.Value
+	accessableField, addressableSourceCopy = GetStructUnExportedField(source, fieldName)
+	rv := reflect.ValueOf(fieldVal)
+	if accessableField.Kind() != rv.Kind() {
+		return addressableSourceCopy, fmt.Errorf("invalid kind: expected kind %v, got kind: %v", addressableSourceCopy.Kind(), rv.Kind())
+	}
+	accessableField.Set(rv)
+	return
+}
+
+func GetStructPtrUnExportedField(source interface{}, fieldName string) reflect.Value {
+	v := reflect.ValueOf(source).Elem().FieldByName(fieldName)
+	return reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem()
+}
+
+func GetStructUnExportedField(source interface{}, fieldName string) (accessableField, addressableSourceCopy reflect.Value) {
+	v := reflect.ValueOf(source)
+	// since source is not a ptr, get an addressable copy of source to modify it later
+	addressableSourceCopy = reflect.New(v.Type()).Elem()
+	addressableSourceCopy.Set(v)
+	accessableField = addressableSourceCopy.FieldByName(fieldName)
+	accessableField = reflect.NewAt(accessableField.Type(), unsafe.Pointer(accessableField.UnsafeAddr())).Elem()
+	return
 }
 
 func (gdi *GDIPool) Debug(isDebug bool) {

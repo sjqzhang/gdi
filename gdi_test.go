@@ -6,7 +6,7 @@ import (
 )
 
 func init() {
-	ScanPkgPaths("github.com/sjqzhang/gdi")
+
 }
 
 type gdiTest struct {
@@ -32,8 +32,6 @@ func TestAll(t *testing.T) {
 	name := "gdi"
 	gp := NewGDIPool()
 	gp.Debug(true)
-	gp.ScanPkgPaths("github.com/sjqzhang/gdi")
-	gp.IgnoreInterfaceInject(false)
 	gp.Register(&gdiTest{
 		Name: name,
 	}, func() *gdiTest2 {
@@ -82,7 +80,6 @@ func TestAll2(t *testing.T) {
 
 	name := "gdi"
 
-	IgnoreInterfaceInject(false)
 
 	Register(&gdiTest{
 		Name: name,
