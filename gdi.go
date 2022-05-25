@@ -13,7 +13,7 @@ import (
 )
 
 var globalGDI *GDIPool
-
+//GDIPool 依赖注入容器
 type GDIPool struct {
 	debug                 bool
 	scanPkgPaths          []string
@@ -36,7 +36,7 @@ var consoleLog = log.New(os.Stdout, "[gdi] ", log.LstdFlags)
 func init() {
 	globalGDI = NewGDIPool()
 }
-
+//NewGDIPool 创建依赖容器
 func NewGDIPool() *GDIPool {
 	modName := "main"
 	pool := &GDIPool{
@@ -81,6 +81,8 @@ func RegisterReadOnly(funcObjOrPtrs ...interface{}) {
 //func ScanPkgPaths(scanPaths ...string) {
 //	globalGDI.scanPkgPaths = scanPaths
 //}
+
+
 // AutoCreate 是否自动创建对象，true:自动创建，false:非自动创建 default:true
 func AutoCreate(autoCreate bool) {
 	if autoCreate {
@@ -107,11 +109,12 @@ func DI(pointer interface{}) error {
 func MapToImplement(pkgToFieldInteface interface{}, pkgImplement interface{}) error {
 	return globalGDI.MapToImplement(pkgToFieldInteface, pkgImplement)
 }
-
+//GetAllTypes 获取所有类型
 func GetAllTypes() []reflect.Type {
 	return globalGDI.GetAllTypes()
 }
 
+//GetWithCheck 从容器中获取值
 func GetWithCheck(t interface{}) (value interface{}, ok bool) {
 	return globalGDI.GetWithCheck(value)
 }
@@ -124,14 +127,14 @@ func Init() {
 //func (gdi *GDIPool) IgnoreInterfaceInject(isIgnoreInterfaceInject bool) {
 //	gdi.ignoreInterface = isIgnoreInterfaceInject
 //}
-
+//ScanPkgPaths deprecated
 func (gdi *GDIPool) ScanPkgPaths(scanPaths ...string) {
 	gdi.scanPkgPaths = append(gdi.scanPkgPaths, scanPaths...)
 }
 
 //Register 用于注册自己的业务代码
 func (gdi *GDIPool) Register(funcObjOrPtrs ...interface{}) {
-	for i, _ := range funcObjOrPtrs {
+	for i := range funcObjOrPtrs {
 		funcObjOrPtr := funcObjOrPtrs[i]
 		ftype := reflect.TypeOf(funcObjOrPtr)
 		if ftype.Kind() != reflect.Ptr && ftype.Kind() != reflect.Func {
@@ -162,7 +165,7 @@ func (gdi *GDIPool) Register(funcObjOrPtrs ...interface{}) {
 
 // RegisterReadOnly 用于注册第三方代码，非自己的业务代码
 func (gdi *GDIPool) RegisterReadOnly(funcObjOrPtrs ...interface{}) {
-	for i, _ := range funcObjOrPtrs {
+	for i := range funcObjOrPtrs {
 		funcObjOrPtr := funcObjOrPtrs[i]
 		ftype := reflect.TypeOf(funcObjOrPtr)
 		if ftype.Kind() != reflect.Ptr && ftype.Kind() != reflect.Func {
@@ -385,6 +388,7 @@ func (gdi *GDIPool) build(v reflect.Value) {
 
 	}
 }
+//SetStructPtrUnExportedStrField 通过结构体指针设置字段属性
 func SetStructPtrUnExportedStrField(source interface{}, fieldName string, fieldVal interface{}) (err error) {
 	v := GetStructPtrUnExportedField(source, fieldName)
 	rv := reflect.ValueOf(fieldVal)
@@ -395,7 +399,7 @@ func SetStructPtrUnExportedStrField(source interface{}, fieldName string, fieldV
 	v.Set(rv)
 	return nil
 }
-
+//SetStructUnExportedStrField 设置结构体中未导出属性
 func SetStructUnExportedStrField(source interface{}, fieldName string, fieldVal interface{}) (addressableSourceCopy reflect.Value, err error) {
 	var accessableField reflect.Value
 	accessableField, addressableSourceCopy = GetStructUnExportedField(source, fieldName)
@@ -406,12 +410,13 @@ func SetStructUnExportedStrField(source interface{}, fieldName string, fieldVal 
 	accessableField.Set(rv)
 	return
 }
-
+//GetStructPtrUnExportedField 通过结构体指针获取未导出属性
 func GetStructPtrUnExportedField(source interface{}, fieldName string) reflect.Value {
 	v := reflect.ValueOf(source).Elem().FieldByName(fieldName)
 	return reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem()
 }
 
+//GetStructUnExportedField 获取结构构未导出属性
 func GetStructUnExportedField(source interface{}, fieldName string) (accessableField, addressableSourceCopy reflect.Value) {
 	v := reflect.ValueOf(source)
 	// since source is not a ptr, get an addressable copy of source to modify it later
@@ -421,10 +426,11 @@ func GetStructUnExportedField(source interface{}, fieldName string) (accessableF
 	accessableField = reflect.NewAt(accessableField.Type(), unsafe.Pointer(accessableField.UnsafeAddr())).Elem()
 	return
 }
-
+//Debug 是否开启调试信息
 func (gdi *GDIPool) Debug(isDebug bool) {
 	gdi.debug = isDebug
 }
+//Debug 是否开启调试信息
 func Debug(isDebug bool) {
 	globalGDI.debug = isDebug
 }
@@ -433,7 +439,7 @@ func Debug(isDebug bool) {
 func (gdi *GDIPool) AutoCreate(create bool) {
 	gdi.autoCreate = create
 }
-
+//GetAllTypes 获取所有类型
 func (gdi *GDIPool) GetAllTypes() []reflect.Type {
 	sections, offsets := tl.Typelinks()
 	var tys []reflect.Type
@@ -482,7 +488,7 @@ func (gdi *GDIPool) Invoke(t interface{}) (interface{}, error) {
 			}
 		}
 		if ftype.NumIn() != len(args) {
-			return nil, errors.New("(WARNING) can't inject all parameters!!!")
+			return nil, errors.New("(WARNING) can't inject all parameters")
 		}
 		values := funValue.Call(args)
 		if len(values) == 0 {
@@ -527,6 +533,7 @@ func (gdi *GDIPool) Get(t interface{}) (value interface{}) {
 	return result.Interface()
 
 }
+//GetWithCheck 从容器中获取值
 func (gdi *GDIPool) GetWithCheck(t interface{}) (value interface{}, ok bool) {
 	var result reflect.Value
 	if name, o := t.(string); o {
@@ -570,7 +577,7 @@ func (gdi *GDIPool) get(t reflect.Type) (result reflect.Value, ok bool) {
 	}
 	return
 }
-
+// MapToImplement 设定接品与实现的映射关系 Example：gdi.MapToImplement(&AA{},&Q{}
 func (gdi *GDIPool) MapToImplement(pkgToFieldInteface interface{}, pkgImplement interface{}) error {
 	if reflect.TypeOf(pkgToFieldInteface).Kind() != reflect.Ptr || reflect.TypeOf(pkgImplement).Kind() != reflect.Ptr {
 		return fmt.Errorf("pkgToFieldInteface and pkgImplement must be a Ptr")
@@ -607,7 +614,7 @@ func (gdi *GDIPool) getByInterface(i reflect.Type, fieldName string, v reflect.V
 	}
 	gdi.ttvLocker.Lock()
 	defer gdi.ttvLocker.Unlock()
-	for t, _ := range gdi.allTypesToValues {
+	for t:= range gdi.allTypesToValues {
 		if t.Kind() != reflect.Ptr {
 			continue
 		}
@@ -631,7 +638,7 @@ func (gdi *GDIPool) getByInterface(i reflect.Type, fieldName string, v reflect.V
 		}
 	}
 
-	return reflect.Value{}, fmt.Errorf("interface type:%v not found.please use gdi.MapToImplement to set Interface->Implements.", i.Name())
+	return reflect.Value{}, fmt.Errorf("interface type:%v not found.please use gdi.MapToImplement to set Interface->Implements", i.Name())
 }
 
 func (gdi *GDIPool) getByName(name string) (result reflect.Value, ok bool) {
@@ -773,15 +780,15 @@ func (gdi *GDIPool) set(outType reflect.Type, f interface{}) {
 func (gdi *GDIPool) parsePoolFunc(f interface{}) (outType reflect.Type, e error) {
 	ftype := reflect.TypeOf(f)
 	if ftype.Kind() != reflect.Func {
-		e = errors.New(fmt.Sprintf("%v it's not a func", f))
+		e =  fmt.Errorf("%v it's not a func", f)
 		return
 	}
 	if ftype.NumOut() == 0 {
-		e = errors.New(fmt.Sprintf("%v return values should be a pointer", f))
+		e =  fmt.Errorf("%v return values should be a pointer", f)
 		return
 	}
 	if ftype.NumOut() > 2 {
-		e = errors.New("return values should be less 2 !!!!")
+		e = errors.New("return values should be less 2")
 		return
 	}
 	outType = ftype.Out(0)
