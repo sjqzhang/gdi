@@ -7,7 +7,7 @@ import (
 func Typelinks() (sections []unsafe.Pointer, offset [][]int32) {
 	return typelinks()
 }
-
+//go:linkname typelinks reflect.typelinks
 func typelinks() (sections []unsafe.Pointer, offset [][]int32)
 
 func Add(p unsafe.Pointer, x uintptr, whySafe string) unsafe.Pointer {

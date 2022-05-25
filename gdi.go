@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"reflect"
-	"runtime"
 	"strings"
 	"sync"
 	"unsafe"
@@ -50,16 +49,19 @@ func NewGDIPool() *GDIPool {
 		ttvLocker:             sync.RWMutex{},
 	}
 }
+
 //Register 用于注册自己的业务代码
 func Register(funcObjOrPtrs ...interface{}) {
 	globalGDI.Register(funcObjOrPtrs...)
 
 }
+
 // RegisterReadOnly 用于注册第三方代码，非自己的业务代码
 func RegisterReadOnly(funcObjOrPtrs ...interface{}) {
 	globalGDI.RegisterReadOnly(funcObjOrPtrs...)
 
 }
+
 //func IgnoreInterfaceInject(isIgnoreInterfaceInject bool) {
 //	globalGDI.ignoreInterface = isIgnoreInterfaceInject
 //}
@@ -74,14 +76,17 @@ func AutoCreate(autoCreate bool) {
 	}
 	globalGDI.AutoCreate(autoCreate)
 }
+
 // Get 通过类型或名称从容器中获取对象
 func Get(t interface{}) (value interface{}) {
 	return globalGDI.Get(t)
 }
+
 // Invoke 函数参数自动注入
 func Invoke(t interface{}) (interface{}, error) {
 	return globalGDI.Invoke(t)
 }
+
 // DI 自动依懒注入
 func DI(pointer interface{}) error {
 	return globalGDI.DI(pointer)
@@ -90,6 +95,7 @@ func DI(pointer interface{}) error {
 func GetWithCheck(t interface{}) (value interface{}, ok bool) {
 	return globalGDI.GetWithCheck(value)
 }
+
 //Init 在使用前必须先调用它
 func Init() {
 	globalGDI.Init()
@@ -102,6 +108,7 @@ func Init() {
 func (gdi *GDIPool) ScanPkgPaths(scanPaths ...string) {
 	gdi.scanPkgPaths = append(gdi.scanPkgPaths, scanPaths...)
 }
+
 //Register 用于注册自己的业务代码
 func (gdi *GDIPool) Register(funcObjOrPtrs ...interface{}) {
 	for i, _ := range funcObjOrPtrs {
@@ -132,6 +139,7 @@ func (gdi *GDIPool) Register(funcObjOrPtrs ...interface{}) {
 		}
 	}
 }
+
 // RegisterReadOnly 用于注册第三方代码，非自己的业务代码
 func (gdi *GDIPool) RegisterReadOnly(funcObjOrPtrs ...interface{}) {
 	for i, _ := range funcObjOrPtrs {
@@ -162,6 +170,7 @@ func (gdi *GDIPool) RegisterReadOnly(funcObjOrPtrs ...interface{}) {
 		}
 	}
 }
+
 //Init 在使用前必须先调用它
 func (gdi *GDIPool) Init() *GDIPool {
 
@@ -219,7 +228,39 @@ func (gdi *GDIPool) Init() *GDIPool {
 	for _, v := range gdi.namesToValues {
 		gdi.build(v)
 	}
+	//if err:=gdi.checkPoolNil();err!=nil {
+	//	panic(err)
+	//}
 	return gdi
+}
+func (gdi *GDIPool) checkPoolNil() error {
+	for t,v:=range gdi.all() {
+		if v.Elem().Kind() != reflect.Struct {
+			continue
+		}
+		for i := 0; i < v.Elem().NumField(); i++ {
+			field := v.Elem().Field(i)
+			fieldName := v.Type().Elem().Field(i).Name
+			if (field.Kind() == reflect.Interface || field.Kind() == reflect.Ptr) && field.IsNil() {
+				return fmt.Errorf("fieldname:%v of %v is null",fieldName,t.String())
+			}
+		}
+	}
+	gdi.ttvLocker.Lock()
+	defer gdi.ttvLocker.Unlock()
+	for name, v := range gdi.namesToValues {
+		if v.Elem().Kind() != reflect.Struct {
+			continue
+		}
+		for i := 0; i < v.Elem().NumField(); i++ {
+			field := v.Elem().Field(i)
+			fieldName := v.Type().Elem().Field(i).Name
+			if (field.Kind() == reflect.Interface || field.Kind() == reflect.Ptr) && field.IsNil() {
+				return fmt.Errorf("fieldname:%v of %v is null",fieldName,name)
+			}
+		}
+	}
+	return nil
 }
 
 func (gdi *GDIPool) all() map[reflect.Type]reflect.Value {
@@ -245,6 +286,8 @@ func (gdi *GDIPool) build(v reflect.Value) {
 		return
 	}
 	for i := 0; i < v.Elem().NumField(); i++ {
+		injectFlag := false
+		injectFlagPrt := &injectFlag
 		field := v.Elem().Field(i)
 		pkgPath := v.Type().Elem().PkgPath()
 		fieldName := v.Type().Elem().Field(i).Name
@@ -262,10 +305,14 @@ func (gdi *GDIPool) build(v reflect.Value) {
 			readOnly = true
 		}
 		defer func() {
-			if readOnly {
-				gdi.warn(fmt.Sprintf("inject fieldName:%v->%v of %v pkgPath:%v", fieldName,field.Type(), v.Type(), pkgPath))
+			if *injectFlagPrt {
+				if readOnly {
+					gdi.warn(fmt.Sprintf("inject fieldName:%v->%v of %v pkgPath:%v", fieldName, field.Type(), v.Type(), pkgPath))
+				} else {
+					gdi.log(fmt.Sprintf("inject fieldName:%v->%v of %v pkgPath:%v", fieldName, field.Type(), v.Type(), pkgPath))
+				}
 			} else {
-				gdi.log(fmt.Sprintf("inject fieldName:%v->%v of %v pkgPath:%v", fieldName,field.Type(), v.Type(), pkgPath))
+				gdi.panic(fmt.Sprintf("inject fail fieldName:%v->%v of %v pkgPath:%v", fieldName, field.Type(), v.Type(), pkgPath))
 			}
 
 		}()
@@ -273,17 +320,20 @@ func (gdi *GDIPool) build(v reflect.Value) {
 		if ok && name != "" {
 			if value, ok := gdi.getByName(name); ok {
 				field.Set(value)
-				continue
+				injectFlag = true
 			} else {
 				gdi.panic(fmt.Sprintf("name:%v type:%v object not found", name, field.Type()))
 			}
+			continue
 		}
 		if field.Kind() == reflect.Interface {
 			if !field.IsNil() {
+				injectFlag=true
 				continue
 			}
 			if im, err := gdi.getByInterface(field.Type()); err == nil {
 				field.Set(im)
+				injectFlag = true
 				continue
 			} else {
 				if field.Type().String() != "interface {}" && field.Type().String() != "error" {
@@ -293,17 +343,24 @@ func (gdi *GDIPool) build(v reflect.Value) {
 					continue
 				}
 			}
+			continue
 		}
 		if im, ok := gdi.get(field.Type()); ok {
 			field.Set(im)
+			injectFlag = true
+			continue
 		} else {
 			if gdi.autoCreate {
 				value := reflect.New(field.Type().Elem())
 				field.Set(value)
+				injectFlag = true
 				gdi.warn(fmt.Sprintf("\u001B[1;35mautoCreate\u001B[0m type:%v fieldName:%v of %v", field.Type(), fieldName, v.Type()))
 				gdi.set(field.Type(), value.Interface())
 				gdi.build(value)
+			} else {
+				injectFlag = false
 			}
+
 		}
 
 	}
@@ -351,15 +408,18 @@ func (gdi *GDIPool) Debug(isDebug bool) {
 func Debug(isDebug bool) {
 	globalGDI.debug = isDebug
 }
+
 // AutoCreate 是否自动创建对象，true:自动创建，false:非自动创建 default:true
 func (gdi *GDIPool) AutoCreate(create bool) {
 	gdi.autoCreate = create
 }
+
 // DI 自动依懒注入
-func (gdi *GDIPool) DI(pointer interface{}) error {
+func (gdi *GDIPool) DI(pointer interface{}) (e error) {
 	defer func() {
 		if err := recover(); err != nil {
 			gdi.warn(fmt.Sprintf("%v", err))
+			e = fmt.Errorf(fmt.Sprintf("%v", err))
 		}
 	}()
 	var result reflect.Value
@@ -372,8 +432,9 @@ func (gdi *GDIPool) DI(pointer interface{}) error {
 		return errors.New("(ERROR) pointer is null ")
 	}
 	gdi.build(result)
-	return nil
+	return e
 }
+
 // Invoke 函数参数自动注入
 func (gdi *GDIPool) Invoke(t interface{}) (interface{}, error) {
 	ftype := reflect.TypeOf(t)
@@ -415,6 +476,7 @@ func (gdi *GDIPool) Invoke(t interface{}) (interface{}, error) {
 	return nil, nil
 
 }
+
 // Get 通过类型或名称从容器中获取对象
 func (gdi *GDIPool) Get(t interface{}) (value interface{}) {
 	var ok bool
@@ -521,15 +583,14 @@ func (gdi *GDIPool) warn(msg string) {
 	colorNormal := "\033[0m"
 	consoleLog.Println(fmt.Sprintf("%v%v%v", colorYellow, "WARNNING: "+msg, colorNormal))
 }
-
-func (gdi *GDIPool) panic(msg string) {
-	var buf [2 << 10]byte
+func (gdi *GDIPool) error(msg string) {
 	colorRed := "\033[1;31m"
 	colorNormal := "\033[0m"
-	consoleLog.Println(colorRed + "PANIC:  注意查看以下提示（WARNNING:Pay attention to the following tips）" + colorNormal)
-	consoleLog.Println(string(buf[:runtime.Stack(buf[:], true)]))
-	consoleLog.Fatal(colorRed + msg + colorNormal)
-
+	consoleLog.Println(fmt.Sprintf("%v%v%v", colorRed, "ERROR: "+msg, colorNormal))
+}
+func (gdi *GDIPool) panic(msg string) {
+	gdi.error(msg)
+	panic("")
 }
 
 func (gdi *GDIPool) create(fun interface{}) []reflect.Value {
