@@ -3,6 +3,7 @@ package gdi
 import (
 	"errors"
 	"fmt"
+	"github.com/sjqzhang/gdi/tl"
 	"log"
 	"os"
 	"reflect"
@@ -21,10 +22,13 @@ type GDIPool struct {
 	creatorLocker         sync.RWMutex
 	typeToValuesReadOnly  map[reflect.Type]reflect.Value
 	typeToValues          map[reflect.Type]reflect.Value
+	allTypesToValues      map[reflect.Type]reflect.Value
 	namesToValues         map[string]reflect.Value
 	namesToValuesReadOnly map[string]reflect.Value
-	ttvLocker             sync.RWMutex
-	autoCreate            bool
+	interfaceToImplements map[string]string
+
+	ttvLocker  sync.RWMutex
+	autoCreate bool
 }
 
 var consoleLog = log.New(os.Stdout, "[gdi] ", log.LstdFlags)
@@ -35,19 +39,27 @@ func init() {
 
 func NewGDIPool() *GDIPool {
 	modName := "main"
-	return &GDIPool{
+	pool := &GDIPool{
 		debug:                 true,
 		scanPkgPaths:          []string{modName},
 		ignoreInterface:       false,
 		autoCreate:            true,
 		creator:               make(map[reflect.Type]interface{}),
 		creatorLocker:         sync.RWMutex{},
+		allTypesToValues:      make(map[reflect.Type]reflect.Value),
 		typeToValues:          make(map[reflect.Type]reflect.Value),
 		typeToValuesReadOnly:  make(map[reflect.Type]reflect.Value),
 		namesToValues:         make(map[string]reflect.Value),
 		namesToValuesReadOnly: make(map[string]reflect.Value),
+		interfaceToImplements: make(map[string]string),
 		ttvLocker:             sync.RWMutex{},
 	}
+	for _, t := range GetAllTypes() {
+
+		pool.allTypesToValues[t] = reflect.ValueOf(nil)
+	}
+
+	return pool
 }
 
 //Register 用于注册自己的业务代码
@@ -90,6 +102,14 @@ func Invoke(t interface{}) (interface{}, error) {
 // DI 自动依懒注入
 func DI(pointer interface{}) error {
 	return globalGDI.DI(pointer)
+}
+// MapToImplement 设定接品与实现的映射关系 Example：gdi.MapToImplement(&AA{},&Q{}
+func MapToImplement(pkgToFieldInteface interface{}, pkgImplement interface{}) error {
+	return globalGDI.MapToImplement(pkgToFieldInteface, pkgImplement)
+}
+
+func GetAllTypes() []reflect.Type {
+	return globalGDI.GetAllTypes()
 }
 
 func GetWithCheck(t interface{}) (value interface{}, ok bool) {
@@ -234,7 +254,7 @@ func (gdi *GDIPool) Init() *GDIPool {
 	return gdi
 }
 func (gdi *GDIPool) checkPoolNil() error {
-	for t,v:=range gdi.all() {
+	for t, v := range gdi.all() {
 		if v.Elem().Kind() != reflect.Struct {
 			continue
 		}
@@ -242,7 +262,7 @@ func (gdi *GDIPool) checkPoolNil() error {
 			field := v.Elem().Field(i)
 			fieldName := v.Type().Elem().Field(i).Name
 			if (field.Kind() == reflect.Interface || field.Kind() == reflect.Ptr) && field.IsNil() {
-				return fmt.Errorf("fieldname:%v of %v is null",fieldName,t.String())
+				return fmt.Errorf("fieldname:%v of %v is null", fieldName, t.String())
 			}
 		}
 	}
@@ -256,7 +276,7 @@ func (gdi *GDIPool) checkPoolNil() error {
 			field := v.Elem().Field(i)
 			fieldName := v.Type().Elem().Field(i).Name
 			if (field.Kind() == reflect.Interface || field.Kind() == reflect.Ptr) && field.IsNil() {
-				return fmt.Errorf("fieldname:%v of %v is null",fieldName,name)
+				return fmt.Errorf("fieldname:%v of %v is null", fieldName, name)
 			}
 		}
 	}
@@ -328,10 +348,10 @@ func (gdi *GDIPool) build(v reflect.Value) {
 		}
 		if field.Kind() == reflect.Interface {
 			if !field.IsNil() {
-				injectFlag=true
+				injectFlag = true
 				continue
 			}
-			if im, err := gdi.getByInterface(field.Type()); err == nil {
+			if im, err := gdi.getByInterface(field.Type(), fieldName, v); err == nil {
 				field.Set(im)
 				injectFlag = true
 				continue
@@ -412,6 +432,19 @@ func Debug(isDebug bool) {
 // AutoCreate 是否自动创建对象，true:自动创建，false:非自动创建 default:true
 func (gdi *GDIPool) AutoCreate(create bool) {
 	gdi.autoCreate = create
+}
+
+func (gdi *GDIPool) GetAllTypes() []reflect.Type {
+	sections, offsets := tl.Typelinks()
+	var tys []reflect.Type
+	for i, base := range sections {
+		for _, offset := range offsets[i] {
+			typeAddr := tl.Add(base, uintptr(offset), "")
+			typ := reflect.TypeOf(*(*interface{})(unsafe.Pointer(&typeAddr)))
+			tys = append(tys, typ)
+		}
+	}
+	return tys
 }
 
 // DI 自动依懒注入
@@ -538,7 +571,15 @@ func (gdi *GDIPool) get(t reflect.Type) (result reflect.Value, ok bool) {
 	return
 }
 
-func (gdi *GDIPool) getByInterface(i reflect.Type) (value reflect.Value, err error) {
+func (gdi *GDIPool) MapToImplement(pkgToFieldInteface interface{}, pkgImplement interface{}) error {
+	if reflect.TypeOf(pkgToFieldInteface).Kind() != reflect.Ptr || reflect.TypeOf(pkgImplement).Kind() != reflect.Ptr {
+		return fmt.Errorf("pkgToFieldInteface and pkgImplement must be a Ptr")
+	}
+	gdi.interfaceToImplements[reflect.TypeOf(pkgToFieldInteface).String()] = reflect.TypeOf(pkgImplement).String()
+	return nil
+}
+
+func (gdi *GDIPool) getByInterface(i reflect.Type, fieldName string, v reflect.Value) (value reflect.Value, err error) {
 	cnt := 0
 	var values []reflect.Value
 	for t, v := range gdi.all() {
@@ -546,6 +587,11 @@ func (gdi *GDIPool) getByInterface(i reflect.Type) (value reflect.Value, err err
 			cnt++
 			value = v
 			values = append(values, v)
+			for tface, timpl := range gdi.interfaceToImplements {
+				if tface == v.Type().String() && t.String() == timpl {
+					return value, nil
+				}
+			}
 		}
 	}
 	if cnt == 1 {
@@ -556,10 +602,36 @@ func (gdi *GDIPool) getByInterface(i reflect.Type) (value reflect.Value, err err
 		for _, v := range values {
 			msgs = append(msgs, fmt.Sprintf("%v", v.Type()))
 		}
-		msg := fmt.Sprintf("there is one more object impliment %v interface [%v].", i.Name(), strings.Join(msgs, ","))
+		msg := fmt.Sprintf("there is one more object impliment %v interface [%v].please use gdi.MapToImplement to set Interface->Implements.", i.Name(), strings.Join(msgs, ","))
 		return reflect.Value{}, fmt.Errorf(msg)
 	}
-	return reflect.Value{}, fmt.Errorf("interface type:%v not found", i.Name())
+	gdi.ttvLocker.Lock()
+	defer gdi.ttvLocker.Unlock()
+	for t, _ := range gdi.allTypesToValues {
+		if t.Kind() != reflect.Ptr {
+			continue
+		}
+		if t.Elem().Kind() != reflect.Struct {
+			continue
+		}
+		//if strings.ToLower(strings.TrimSpace(t.Elem().PkgPath()))=="main" {
+		//  fmt.Sprintf("enter")
+		//}
+		if t.Implements(i) {
+			for tface, timpl := range gdi.interfaceToImplements {
+				if v.Type().String() == tface && t.String() == timpl {
+					if gdi.autoCreate {
+						value = reflect.New(t.Elem())
+						gdi.warn(fmt.Sprintf("\u001B[1;35mautoCreate\u001B[0m  type:%v fieldName:%v of %v", t, fieldName, v.Type()))
+						gdi.set(t, value.Interface())
+						return value, nil
+					}
+				}
+			}
+		}
+	}
+
+	return reflect.Value{}, fmt.Errorf("interface type:%v not found.please use gdi.MapToImplement to set Interface->Implements.", i.Name())
 }
 
 func (gdi *GDIPool) getByName(name string) (result reflect.Value, ok bool) {
