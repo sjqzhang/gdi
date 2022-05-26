@@ -615,25 +615,7 @@ func (gdi *GDIPool) MapToImplement(pkgToFieldInteface interface{}, pkgImplement 
 }
 
 func (gdi *GDIPool) getByInterface(i reflect.Type, fieldName string, v reflect.Value) (value reflect.Value, err error) {
-	for t := range gdi.allTypesToValues {
-		if t.Kind() != reflect.Ptr {
-			continue
-		}
-		if t.Elem().Kind() != reflect.Struct {
-			continue
-		}
-		//if strings.ToLower(strings.TrimSpace(t.Elem().PkgPath()))=="main" {
-		//  fmt.Sprintf("enter")
-		//}
-		if t.Implements(i) {
-			if gdi.autoCreate {
-				value = reflect.New(t.Elem())
-				gdi.warn(fmt.Sprintf("\u001B[1;35mautoCreate\u001B[0m  type:%v fieldName:%v of %v", t, fieldName, v.Type()))
-				gdi.set(t, value.Interface())
-				//return value, nil
-			}
-		}
-	}
+tag:
 	cnt := 0
 	var values []reflect.Value
 	for t, v2 := range gdi.all() {
@@ -658,6 +640,30 @@ func (gdi *GDIPool) getByInterface(i reflect.Type, fieldName string, v reflect.V
 		}
 		msg := fmt.Sprintf("there is one more object impliment %v interface [%v].please use gdi.MapToImplement to set Interface->Implements.", i.Name(), strings.Join(msgs, ","))
 		return reflect.Value{}, fmt.Errorf(msg)
+	}
+    bflag:=false
+	for t := range gdi.allTypesToValues {
+		if t.Kind() != reflect.Ptr {
+			continue
+		}
+		if t.Elem().Kind() != reflect.Struct {
+			continue
+		}
+		//if strings.ToLower(strings.TrimSpace(t.Elem().PkgPath()))=="main" {
+		//  fmt.Sprintf("enter")
+		//}
+		if t.Implements(i) {
+			if gdi.autoCreate {
+				value = reflect.New(t.Elem())
+				gdi.warn(fmt.Sprintf("\u001B[1;35mautoCreate\u001B[0m  type:%v fieldName:%v of %v", t, fieldName, v.Type()))
+				gdi.set(t, value.Interface())
+				bflag=true
+				//return value, nil
+			}
+		}
+	}
+	if bflag {
+		goto tag
 	}
 
 	return reflect.Value{}, fmt.Errorf("interface type:%v not found.please use gdi.MapToImplement to set Interface->Implements", i.Name())
