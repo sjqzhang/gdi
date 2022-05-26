@@ -13,6 +13,17 @@ import (
 )
 
 var globalGDI *GDIPool
+
+type logLevel int
+
+const (
+	logLevelInfo logLevel = iota
+	logLevelWarning
+	logLevelError
+	logLevelPanic
+	logLevelExit
+)
+
 //GDIPool 依赖注入容器
 type GDIPool struct {
 	debug                 bool
@@ -36,6 +47,7 @@ var consoleLog = log.New(os.Stdout, "[gdi] ", log.LstdFlags)
 func init() {
 	globalGDI = NewGDIPool()
 }
+
 //NewGDIPool 创建依赖容器
 func NewGDIPool() *GDIPool {
 	modName := "main"
@@ -82,7 +94,6 @@ func RegisterReadOnly(funcObjOrPtrs ...interface{}) {
 //	globalGDI.scanPkgPaths = scanPaths
 //}
 
-
 // AutoCreate 是否自动创建对象，true:自动创建，false:非自动创建 default:true
 func AutoCreate(autoCreate bool) {
 	if autoCreate {
@@ -105,10 +116,12 @@ func Invoke(t interface{}) (interface{}, error) {
 func DI(pointer interface{}) error {
 	return globalGDI.DI(pointer)
 }
+
 // MapToImplement 设定接品与实现的映射关系 Example：gdi.MapToImplement(&AA{},&Q{}
 func MapToImplement(pkgToFieldInteface interface{}, pkgImplement interface{}) error {
 	return globalGDI.MapToImplement(pkgToFieldInteface, pkgImplement)
 }
+
 //GetAllTypes 获取所有类型
 func GetAllTypes() []reflect.Type {
 	return globalGDI.GetAllTypes()
@@ -246,10 +259,10 @@ func (gdi *GDIPool) Init() *GDIPool {
 	}
 
 	for _, v := range gdi.typeToValues {
-		gdi.build(v)
+		gdi.build(v, true)
 	}
 	for _, v := range gdi.namesToValues {
-		gdi.build(v)
+		gdi.build(v, true)
 	}
 	//if err:=gdi.checkPoolNil();err!=nil {
 	//	panic(err)
@@ -304,13 +317,27 @@ func (gdi *GDIPool) pkgInScanPaths(pkg string) bool {
 	return false
 }
 
-func (gdi *GDIPool) build(v reflect.Value) {
+func (gdi *GDIPool) injectLog(fieldName string, field reflect.Value, vStruct reflect.Value, pkgPath string, level logLevel) {
+	switch level {
+	case logLevelWarning:
+		gdi.warn(fmt.Sprintf("inject fieldName:%v->%v of %v pkgPath:%v", fieldName, field.Type(), vStruct.Type(), pkgPath))
+	case logLevelError:
+		gdi.error(fmt.Sprintf("inject fieldName:%v->%v of %v pkgPath:%v", fieldName, field.Type(), vStruct.Type(), pkgPath))
+	case logLevelPanic:
+		gdi.panic(fmt.Sprintf("inject fieldName:%v->%v of %v pkgPath:%v", fieldName, field.Type(), vStruct.Type(), pkgPath))
+	case logLevelExit:
+		gdi.error(fmt.Sprintf("inject fieldName:%v->%v of %v pkgPath:%v", fieldName, field.Type(), vStruct.Type(), pkgPath))
+		os.Exit(1)
+	default:
+		gdi.log(fmt.Sprintf("inject fieldName:%v->%v of %v pkgPath:%v", fieldName, field.Type(), vStruct.Type(), pkgPath))
+	}
+}
+
+func (gdi *GDIPool) build(v reflect.Value, exitOnError bool) {
 	if v.Elem().Kind() != reflect.Struct {
 		return
 	}
 	for i := 0; i < v.Elem().NumField(); i++ {
-		injectFlag := false
-		injectFlagPrt := &injectFlag
 		field := v.Elem().Field(i)
 		pkgPath := v.Type().Elem().PkgPath()
 		fieldName := v.Type().Elem().Field(i).Name
@@ -318,76 +345,72 @@ func (gdi *GDIPool) build(v reflect.Value) {
 		if field.Kind() != reflect.Interface && field.Kind() != reflect.Ptr {
 			continue
 		}
-		//if field.Kind() == reflect.Interface && gdi.ignoreInterface {
-		//	gdi.warn(fmt.Sprintf("\u001B[1;31mignore type:%v fieldName:%v of %v\u001B[0m", field.Type(), fieldName, v.Type()))
-		//	continue
-		//}
-		readOnly := false
 		if !field.CanSet() {
 			field = reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
-			readOnly = true
 		}
-		defer func() {
-			if *injectFlagPrt {
-				if readOnly {
-					gdi.warn(fmt.Sprintf("inject fieldName:%v->%v of %v pkgPath:%v", fieldName, field.Type(), v.Type(), pkgPath))
-				} else {
-					gdi.log(fmt.Sprintf("inject fieldName:%v->%v of %v pkgPath:%v", fieldName, field.Type(), v.Type(), pkgPath))
-				}
-			} else {
-				gdi.panic(fmt.Sprintf("inject fail fieldName:%v->%v of %v pkgPath:%v", fieldName, field.Type(), v.Type(), pkgPath))
-			}
-
-		}()
 		name, ok := gdi.getTagAttr(v.Type().Elem().Field(i), "name")
-		if ok && name != "" {
+		if ok && name != "" { // struct tag inject:name:hello
 			if value, ok := gdi.getByName(name); ok {
 				field.Set(value)
-				injectFlag = true
+				gdi.injectLog(fieldName, field, v, pkgPath, logLevelInfo)
 			} else {
 				gdi.panic(fmt.Sprintf("name:%v type:%v object not found", name, field.Type()))
 			}
-			continue
 		}
-		if field.Kind() == reflect.Interface {
+		if field.Kind() == reflect.Interface { // interface
 			if !field.IsNil() {
-				injectFlag = true
 				continue
 			}
 			if im, err := gdi.getByInterface(field.Type(), fieldName, v); err == nil {
 				field.Set(im)
-				injectFlag = true
+				gdi.injectLog(fieldName, field, v, pkgPath, logLevelInfo)
 				continue
 			} else {
 				if field.Type().String() != "interface {}" && field.Type().String() != "error" {
-					gdi.panic(err.Error())
+					gdi.error(err.Error())
+					if exitOnError {
+						gdi.injectLog(fieldName, field, v, pkgPath, logLevelExit)
+					} else {
+						gdi.injectLog(fieldName, field, v, pkgPath, logLevelError)
+					}
+
 				} else {
 					gdi.warn(fmt.Sprintf("\u001B[1;31mignore type:%v fieldName:%v of %v pkgPath:%v\u001B[0m", field.Type(), fieldName, v.Type(), pkgPath))
 					continue
 				}
 			}
+			if exitOnError {
+				gdi.injectLog(fieldName, field, v, pkgPath, logLevelExit)
+			} else {
+				gdi.injectLog(fieldName, field, v, pkgPath, logLevelError)
+			}
 			continue
 		}
-		if im, ok := gdi.get(field.Type()); ok {
+		if im, ok := gdi.get(field.Type()); ok { // by type
 			field.Set(im)
-			injectFlag = true
+			gdi.injectLog(fieldName, field, v, pkgPath, logLevelInfo)
 			continue
 		} else {
 			if gdi.autoCreate {
 				value := reflect.New(field.Type().Elem())
 				field.Set(value)
-				injectFlag = true
+				gdi.injectLog(fieldName, field, v, pkgPath, logLevelInfo)
 				gdi.warn(fmt.Sprintf("\u001B[1;35mautoCreate\u001B[0m type:%v fieldName:%v of %v", field.Type(), fieldName, v.Type()))
 				gdi.set(field.Type(), value.Interface())
-				gdi.build(value)
-			} else {
-				injectFlag = false
+				gdi.build(value, exitOnError)
 			}
-
+		}
+		if field.IsNil() {
+			if exitOnError {
+				gdi.injectLog(fieldName, field, v, pkgPath, logLevelExit)
+			} else {
+				gdi.injectLog(fieldName, field, v, pkgPath, logLevelError)
+			}
 		}
 
 	}
 }
+
 //SetStructPtrUnExportedStrField 通过结构体指针设置字段属性
 func SetStructPtrUnExportedStrField(source interface{}, fieldName string, fieldVal interface{}) (err error) {
 	v := GetStructPtrUnExportedField(source, fieldName)
@@ -399,6 +422,7 @@ func SetStructPtrUnExportedStrField(source interface{}, fieldName string, fieldV
 	v.Set(rv)
 	return nil
 }
+
 //SetStructUnExportedStrField 设置结构体中未导出属性
 func SetStructUnExportedStrField(source interface{}, fieldName string, fieldVal interface{}) (addressableSourceCopy reflect.Value, err error) {
 	var accessableField reflect.Value
@@ -410,6 +434,7 @@ func SetStructUnExportedStrField(source interface{}, fieldName string, fieldVal 
 	accessableField.Set(rv)
 	return
 }
+
 //GetStructPtrUnExportedField 通过结构体指针获取未导出属性
 func GetStructPtrUnExportedField(source interface{}, fieldName string) reflect.Value {
 	v := reflect.ValueOf(source).Elem().FieldByName(fieldName)
@@ -426,10 +451,12 @@ func GetStructUnExportedField(source interface{}, fieldName string) (accessableF
 	accessableField = reflect.NewAt(accessableField.Type(), unsafe.Pointer(accessableField.UnsafeAddr())).Elem()
 	return
 }
+
 //Debug 是否开启调试信息
 func (gdi *GDIPool) Debug(isDebug bool) {
 	gdi.debug = isDebug
 }
+
 //Debug 是否开启调试信息
 func Debug(isDebug bool) {
 	globalGDI.debug = isDebug
@@ -439,6 +466,7 @@ func Debug(isDebug bool) {
 func (gdi *GDIPool) AutoCreate(create bool) {
 	gdi.autoCreate = create
 }
+
 //GetAllTypes 获取所有类型
 func (gdi *GDIPool) GetAllTypes() []reflect.Type {
 	sections, offsets := tl.Typelinks()
@@ -470,7 +498,7 @@ func (gdi *GDIPool) DI(pointer interface{}) (e error) {
 	if result.IsNil() {
 		return errors.New("(ERROR) pointer is null ")
 	}
-	gdi.build(result)
+	gdi.build(result, false)
 	return e
 }
 
@@ -533,6 +561,7 @@ func (gdi *GDIPool) Get(t interface{}) (value interface{}) {
 	return result.Interface()
 
 }
+
 //GetWithCheck 从容器中获取值
 func (gdi *GDIPool) GetWithCheck(t interface{}) (value interface{}, ok bool) {
 	var result reflect.Value
@@ -577,6 +606,7 @@ func (gdi *GDIPool) get(t reflect.Type) (result reflect.Value, ok bool) {
 	}
 	return
 }
+
 // MapToImplement 设定接品与实现的映射关系 Example：gdi.MapToImplement(&AA{},&Q{}
 func (gdi *GDIPool) MapToImplement(pkgToFieldInteface interface{}, pkgImplement interface{}) error {
 	if reflect.TypeOf(pkgToFieldInteface).Kind() != reflect.Ptr || reflect.TypeOf(pkgImplement).Kind() != reflect.Ptr {
@@ -587,6 +617,27 @@ func (gdi *GDIPool) MapToImplement(pkgToFieldInteface interface{}, pkgImplement 
 }
 
 func (gdi *GDIPool) getByInterface(i reflect.Type, fieldName string, v reflect.Value) (value reflect.Value, err error) {
+	//gdi.ttvLocker.Lock()
+	//defer gdi.ttvLocker.Unlock()
+	for t := range gdi.allTypesToValues {
+		if t.Kind() != reflect.Ptr {
+			continue
+		}
+		if t.Elem().Kind() != reflect.Struct {
+			continue
+		}
+		//if strings.ToLower(strings.TrimSpace(t.Elem().PkgPath()))=="main" {
+		//  fmt.Sprintf("enter")
+		//}
+		if t.Implements(i) {
+			if gdi.autoCreate {
+				value = reflect.New(t.Elem())
+				gdi.warn(fmt.Sprintf("\u001B[1;35mautoCreate\u001B[0m  type:%v fieldName:%v of %v", t, fieldName, v.Type()))
+				gdi.set(t, value.Interface())
+				//return value, nil
+			}
+		}
+	}
 	cnt := 0
 	var values []reflect.Value
 	for t, v := range gdi.all() {
@@ -611,31 +662,6 @@ func (gdi *GDIPool) getByInterface(i reflect.Type, fieldName string, v reflect.V
 		}
 		msg := fmt.Sprintf("there is one more object impliment %v interface [%v].please use gdi.MapToImplement to set Interface->Implements.", i.Name(), strings.Join(msgs, ","))
 		return reflect.Value{}, fmt.Errorf(msg)
-	}
-	gdi.ttvLocker.Lock()
-	defer gdi.ttvLocker.Unlock()
-	for t:= range gdi.allTypesToValues {
-		if t.Kind() != reflect.Ptr {
-			continue
-		}
-		if t.Elem().Kind() != reflect.Struct {
-			continue
-		}
-		//if strings.ToLower(strings.TrimSpace(t.Elem().PkgPath()))=="main" {
-		//  fmt.Sprintf("enter")
-		//}
-		if t.Implements(i) {
-			for tface, timpl := range gdi.interfaceToImplements {
-				if v.Type().String() == tface && t.String() == timpl {
-					if gdi.autoCreate {
-						value = reflect.New(t.Elem())
-						gdi.warn(fmt.Sprintf("\u001B[1;35mautoCreate\u001B[0m  type:%v fieldName:%v of %v", t, fieldName, v.Type()))
-						gdi.set(t, value.Interface())
-						return value, nil
-					}
-				}
-			}
-		}
 	}
 
 	return reflect.Value{}, fmt.Errorf("interface type:%v not found.please use gdi.MapToImplement to set Interface->Implements", i.Name())
@@ -780,11 +806,11 @@ func (gdi *GDIPool) set(outType reflect.Type, f interface{}) {
 func (gdi *GDIPool) parsePoolFunc(f interface{}) (outType reflect.Type, e error) {
 	ftype := reflect.TypeOf(f)
 	if ftype.Kind() != reflect.Func {
-		e =  fmt.Errorf("%v it's not a func", f)
+		e = fmt.Errorf("%v it's not a func", f)
 		return
 	}
 	if ftype.NumOut() == 0 {
-		e =  fmt.Errorf("%v return values should be a pointer", f)
+		e = fmt.Errorf("%v return values should be a pointer", f)
 		return
 	}
 	if ftype.NumOut() > 2 {
