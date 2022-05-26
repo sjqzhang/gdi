@@ -11,8 +11,10 @@ type AA struct {
 	B *BB
 	A *string // `inject:"name:hello"`
 	*CC
-	a interface{} //`inject:"name:hello"`
-	e error
+	//a interface{} //`inject:"name:hello"`
+	//e error
+
+	//i IIer
 }
 
 type BB struct {
@@ -55,12 +57,48 @@ type TT struct {
 
 type IIer interface {
 	Add(a, b int) int
+	Sub(a,b int) int
+
 }
 
 type II struct {
 	A string //`inject:"name:hello"`
 	Home string // `inject:"name:home"`
 }
+
+type Q struct {
+
+	//a *AA
+}
+
+func (ii *Q) Add(a, b int) int {
+
+	return a + b
+}
+
+func (ii *Q) Sub(a, b int) int {
+
+	fmt.Println("Q sub")
+	return a + b
+}
+
+type Z struct {
+
+	//a *AA
+}
+
+func (ii *Z) Add(a, b int) int {
+
+	return a + b
+}
+
+func (ii *Z) Sub(a, b int) int {
+
+	return a + b
+}
+
+
+
 
 func (ii *II) Add(a, b int) int {
 	fmt.Println("ii.a->",ii.A)
@@ -146,53 +184,73 @@ func init() {
 
 func main() {
 
-	//gdi.Register(func()(*II,string) {
-	//	return &II{
-	//		Home: "zh",
-	//	},"hello"
+
+
+	gdi.Debug(true)      //显示注入信息，方便排错，需在gdi.Init()方法之前调用
+	gdi.AutoCreate(true) //开启自动注入
+	gdi.Register(&AA{})
+	gdi.MapToImplement(&AA{},&Q{})
+	gdi.Init()           //使用前必须先调用，当出现无解注入对象时会panic,避免运行时出现空指针
+	var a *AA
+	a = gdi.Get(a).(*AA) //说明，这里可以直接进行类型转换，不会出现空指针，当出现空指针时，gdi.Init()就会panic
+
+	fmt.Println(a.B.C.Name)
+	fmt.Println(a.B.D.C.Age)
+	fmt.Println(a.B.D.Say("zhangsan"))
+
+	fmt.Println(a.B.D.I.Add(2, 3))
+	fmt.Println(a.B.D.E.A.B.D.E.A.B.D.E.A.B.C.Age)
+	fmt.Println(a.B.D.E.A.B.C.Name)
+	fmt.Println(a.B.D.E.T.Hl)
+	fmt.Println(*a.B.D.E.Hello=="")
+	fmt.Println(a.CC.Name)
+	fmt.Println(a.B.e.name)
+	//fmt.Println(a.a.(*II).Home)
+
+
+
+	//var a AA
 	//
-	//})
+	//var q Q
 	//
-	//gdi.Register(&cc{
-	//	name: "xxx",
-	//})
+	//_=q
+	//fmt.Println(q)
+	//
+	//var z Z
+	//
+	//_=z
+	//fmt.Println(z)
+	//
+	//fmt.Println(gdi.MapToImplement(&AA{},&Q{}))
+	//
+	////gdi.AutoCreate(true)
+	//
+	//gdi.Register(&a)
 	//
 	//gdi.Init()
 	//
-	//type X struct {
-	//	a *AA
-	//	b *BB
+	//fmt.Println(a.i.Sub(4,5))
+	//
+	//
+	//b:=AA{}
+	//_=b
+	//
+	//gdi.DI(&a)
+
+
+	//for _,v:=range gdi.GetAllTypes() {
+	//	if reflect.TypeOf(AA{})==v {
+	//
+	//		for i:=0;i<v.Elem().NumField();i++ {
+	//			//gdi.SetStructUnExportedStrField( v.Field(i),"Tag","xxx")
+	//			fmt.Println()
+	//		}
+	//		fmt.Println("xxx")
+	//	}
 	//}
-	//var x X
-	//gdi.DI(&x)
-	//
-	//
-	//fmt.Println(*x.a.A)
-	//gdi.Debug(true)      //显示注入信息，方便排错，需在gdi.Init()方法之前调用
-	//gdi.AutoCreate(true) //开启自动注入
-	//gdi.Init()           //使用前必须先调用，当出现无解注入对象时会panic,避免运行时出现空指针
-	//var a *AA
-	//a = gdi.Get(a).(*AA) //说明，这里可以直接进行类型转换，不会出现空指针，当出现空指针时，gdi.Init()就会panic
-	//fmt.Println(a.B.C.Name)
-	//fmt.Println(a.B.D.C.Age)
-	//fmt.Println(a.B.D.Say("zhangsan"))
-	//
-	//fmt.Println(a.B.D.I.Add(2, 3))
-	//fmt.Println(a.B.D.E.A.B.D.E.A.B.D.E.A.B.C.Age)
-	//fmt.Println(a.B.D.E.A.B.C.Name)
-	//fmt.Println(a.B.D.E.T.Hl)
-	//fmt.Println(*a.B.D.E.Hello=="")
-	//fmt.Println(a.CC.Name)
-	//fmt.Println(a.B.e.name)
-	//fmt.Println(a.a.(*II).Home)
 
-	gdi.Init()
-
-	var a AA
-
-	gdi.DI(&a)
+	//fmt.Println(a.B.D.C.Name)
 
 
-	fmt.Println(a.B.D.C.Name)
 
 }

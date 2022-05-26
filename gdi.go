@@ -67,10 +67,8 @@ func NewGDIPool() *GDIPool {
 		ttvLocker:             sync.RWMutex{},
 	}
 	for _, t := range GetAllTypes() {
-
 		pool.allTypesToValues[t] = reflect.ValueOf(nil)
 	}
-
 	return pool
 }
 
@@ -617,8 +615,6 @@ func (gdi *GDIPool) MapToImplement(pkgToFieldInteface interface{}, pkgImplement 
 }
 
 func (gdi *GDIPool) getByInterface(i reflect.Type, fieldName string, v reflect.Value) (value reflect.Value, err error) {
-	//gdi.ttvLocker.Lock()
-	//defer gdi.ttvLocker.Unlock()
 	for t := range gdi.allTypesToValues {
 		if t.Kind() != reflect.Ptr {
 			continue
@@ -640,11 +636,11 @@ func (gdi *GDIPool) getByInterface(i reflect.Type, fieldName string, v reflect.V
 	}
 	cnt := 0
 	var values []reflect.Value
-	for t, v := range gdi.all() {
+	for t, v2 := range gdi.all() {
 		if t.Implements(i) {
 			cnt++
-			value = v
-			values = append(values, v)
+			value = v2
+			values = append(values, v2)
 			for tface, timpl := range gdi.interfaceToImplements {
 				if tface == v.Type().String() && t.String() == timpl {
 					return value, nil
