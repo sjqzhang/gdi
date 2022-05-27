@@ -335,10 +335,17 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool) {
 	if v.Elem().Kind() != reflect.Struct {
 		return
 	}
+	n := &node{}
+	n.name = v.Type().String()
+	g.add(n)
 	for i := 0; i < v.Elem().NumField(); i++ {
+		nf := &nodeItem{}
+		n.addFiled(nf)
 		field := v.Elem().Field(i)
 		pkgPath := v.Type().Elem().PkgPath()
 		fieldName := v.Type().Elem().Field(i).Name
+		nf.fieldName = fmt.Sprintf(`<f%v>%v`,i, fieldName)
+		nf.fieldType =  v.Type().Elem().Field(i).Type.String()
 		_ = pkgPath
 		if field.Kind() != reflect.Interface && field.Kind() != reflect.Ptr {
 			continue
@@ -349,6 +356,8 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool) {
 		name, ok := gdi.getTagAttr(v.Type().Elem().Field(i), "name")
 		if ok && name != "" { // struct tag inject:name:hello
 			if value, ok := gdi.getByName(name); ok {
+				//n.addEdge(&edge{from: nf.fieldType, to: value.Type().String()})
+				n.addEdge(&edge{from: fmt.Sprintf(`"%v":f%v`, v.Type().String(),i), to: value.Type().String()})
 				field.Set(value)
 				gdi.injectLog(fieldName, field, v, pkgPath, logLevelInfo)
 			} else {
@@ -361,6 +370,8 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool) {
 			}
 			if im, err := gdi.getByInterface(field.Type(), fieldName, v); err == nil {
 				field.Set(im)
+				//n.addEdge(&edge{from: fmt.Sprintf("%v:f%v", nf.fieldType,i), to: im.Type().String()})
+				n.addEdge(&edge{from: fmt.Sprintf(`"%v":f%v`, v.Type().String(),i), to: im.Type().String()})
 				gdi.injectLog(fieldName, field, v, pkgPath, logLevelInfo)
 				continue
 			} else {
@@ -386,12 +397,17 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool) {
 		}
 		if im, ok := gdi.get(field.Type()); ok { // by type
 			field.Set(im)
+			//n.addEdge(&edge{from: nf.fieldType, to: im.Type().String()})
+			n.addEdge(&edge{from: fmt.Sprintf(`"%v":f%v`, v.Type().String(),i), to: im.Type().String()})
+			//n.addFiled(nf)
 			gdi.injectLog(fieldName, field, v, pkgPath, logLevelInfo)
 			continue
 		} else {
 			if gdi.autoCreate {
 				value := reflect.New(field.Type().Elem())
 				field.Set(value)
+				//n.addEdge(&edge{from: nf.fieldType, to: value.Type().String()})
+				n.addEdge(&edge{from: fmt.Sprintf(`"%v":f%v`, v.Type().String(),i), to: value.Type().String()})
 				gdi.injectLog(fieldName, field, v, pkgPath, logLevelInfo)
 				gdi.warn(fmt.Sprintf("\u001B[1;35mautoCreate\u001B[0m type:%v fieldName:%v of %v", field.Type(), fieldName, v.Type()))
 				gdi.set(field.Type(), value.Interface())
@@ -405,7 +421,7 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool) {
 				gdi.injectLog(fieldName, field, v, pkgPath, logLevelError)
 			}
 		}
-
+		//n.addFiled(nf)
 	}
 }
 
@@ -453,6 +469,10 @@ func GetStructUnExportedField(source interface{}, fieldName string) (accessableF
 //Debug 是否开启调试信息
 func (gdi *GDIPool) Debug(isDebug bool) {
 	gdi.debug = isDebug
+}
+
+func  Graph() string {
+	return globalGDI.Graph()
 }
 
 //Debug 是否开启调试信息
@@ -641,7 +661,7 @@ tag:
 		msg := fmt.Sprintf("there is one more object impliment %v interface [%v].please use gdi.MapToImplement to set Interface->Implements.", i.Name(), strings.Join(msgs, ","))
 		return reflect.Value{}, fmt.Errorf(msg)
 	}
-    bflag:=false
+	bflag := false
 	for t := range gdi.allTypesToValues {
 		if t.Kind() != reflect.Ptr {
 			continue
@@ -657,7 +677,7 @@ tag:
 				value = reflect.New(t.Elem())
 				gdi.warn(fmt.Sprintf("\u001B[1;35mautoCreate\u001B[0m  type:%v fieldName:%v of %v", t, fieldName, v.Type()))
 				gdi.set(t, value.Interface())
-				bflag=true
+				bflag = true
 				//return value, nil
 			}
 		}
