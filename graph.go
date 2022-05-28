@@ -81,7 +81,7 @@ rankdir=LR;
 `
 	for _, n := range g.nodes {
 		var fields []string
-		fields = append(fields, fmt.Sprintf(`<table BORDER="1" CELLBORDER="1" CELLSPACING="0"><tr><td PORT="f100">struct %v</td></tr>`, n.name))
+		fields = append(fields, fmt.Sprintf(`<table BORDER="1" CELLBORDER="1" CELLSPACING="0"><tr><td PORT="f100"><font POINT-SIZE="18"><b>struct %v</b></font></td></tr>`, n.name))
 		for _, field := range n.fields {
 			ns:=strings.Split(field.fieldName,"#")
 			fields = append(fields, fmt.Sprintf(`<tr><td PORT="%v">%v %v</td></tr>`,  ns[0],ns[1], field.fieldType))
