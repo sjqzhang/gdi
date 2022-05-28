@@ -68,8 +68,8 @@ func (gdi *GDIPool) Graph() string {
 	*/
 	nodeTpl := `
    "%v" [
-     label = "%v"
-     shape = "record"
+     label = <%v>
+     shape = "none"
  ]
 `
 	gTpl:=`
@@ -81,11 +81,12 @@ rankdir=LR;
 `
 	for _, n := range g.nodes {
 		var fields []string
-		fields = append(fields, fmt.Sprintf("<f100> struct %v", n.name))
+		fields = append(fields, fmt.Sprintf(`<table BORDER="1" CELLBORDER="1" CELLSPACING="0"><tr><td PORT="f100">struct %v</td></tr>`, n.name))
 		for _, field := range n.fields {
-			fields = append(fields, fmt.Sprintf(`%v %v`, field.fieldName, field.fieldType))
+			ns:=strings.Split(field.fieldName,"#")
+			fields = append(fields, fmt.Sprintf(`<tr><td PORT="%v">%v %v</td></tr>`,  ns[0],ns[1], field.fieldType))
 		}
-		gs = append(gs, fmt.Sprintf(nodeTpl, n.name, strings.Join(fields, "|")))
+		gs = append(gs, fmt.Sprintf(nodeTpl, n.name, strings.Join(fields, "")+"</table>"))
 		var edges []string
 		for _, e := range n.edges {
 			edges = append(edges, fmt.Sprintf(`%v->"%v":f100;`, e.from, e.to))

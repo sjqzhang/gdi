@@ -344,7 +344,7 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool) {
 		field := v.Elem().Field(i)
 		pkgPath := v.Type().Elem().PkgPath()
 		fieldName := v.Type().Elem().Field(i).Name
-		nf.fieldName = fmt.Sprintf(`<f%v>%v`,i, fieldName)
+		nf.fieldName = fmt.Sprintf(`f%v#%v`,i, fieldName)
 		nf.fieldType =  v.Type().Elem().Field(i).Type.String()
 		_ = pkgPath
 		if field.Kind() != reflect.Interface && field.Kind() != reflect.Ptr {
