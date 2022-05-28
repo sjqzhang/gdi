@@ -14,9 +14,10 @@ func init() {
 }
 
 type node struct {
-	name   string
-	fields []*nodeItem
-	edges  []*edge
+	name     string
+	fields   []*nodeItem
+	edges    []*edge
+	//fieldMap map[string]struct{}
 	//fields map[string]string
 	//edges  map[string]string
 }
@@ -40,19 +41,21 @@ func (n *node) addFiled(f *nodeItem) {
 	//	n.fields =make(map[string]string)
 	//}
 	//n.fields[f.fieldType]=f.fieldName
-	n.fields=append(n.fields,f)
+
+	n.fields = append(n.fields, f)
 }
 func (n *node) addEdge(e *edge) {
 	//if n.edges==nil {
 	//	n.edges=make(map[string]string)
 	//}
 	//n.edges[e.from]=e.to
-	n.edges=append(n.edges,e)
+	n.edges = append(n.edges, e)
 }
 
-
 func (g *graph) add(n *node) {
-	g.nodes[n.name] = n
+	if _,ok:= g.nodes[n.name];!ok {
+		g.nodes[n.name] = n
+	}
 }
 
 func (gdi *GDIPool) Graph() string {
@@ -69,20 +72,26 @@ func (gdi *GDIPool) Graph() string {
      shape = "record"
  ]
 `
+	gTpl:=`
+digraph { 
+
+rankdir=LR;
+  %v
+}
+`
 	for _, n := range g.nodes {
 		var fields []string
 		fields = append(fields, fmt.Sprintf("<f100> struct %v", n.name))
 		for _, field := range n.fields {
-			fields = append(fields, fmt.Sprintf(`%v %v`, field.fieldName,field.fieldType))
+			fields = append(fields, fmt.Sprintf(`%v %v`, field.fieldName, field.fieldType))
 		}
-		gs=append(gs,	fmt.Sprintf(nodeTpl,n.name,strings.Join(fields,"|")))
+		gs = append(gs, fmt.Sprintf(nodeTpl, n.name, strings.Join(fields, "|")))
 		var edges []string
-		for _, e :=range  n.edges {
+		for _, e := range n.edges {
 			edges = append(edges, fmt.Sprintf(`%v->"%v":f100;`, e.from, e.to))
 		}
-		gs=append(gs,strings.Join(edges,"\n"))
-
+		gs = append(gs, strings.Join(edges, "\n"))
 
 	}
-	return strings.Join(gs,"\n")
+	return fmt.Sprintf(gTpl, strings.Join(gs, "\n"))
 }
