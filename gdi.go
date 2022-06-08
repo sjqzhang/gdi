@@ -344,8 +344,8 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool) {
 		field := v.Elem().Field(i)
 		pkgPath := v.Type().Elem().PkgPath()
 		fieldName := v.Type().Elem().Field(i).Name
-		nf.fieldName = fmt.Sprintf(`f%v#%v`,i, fieldName)
-		nf.fieldType =  v.Type().Elem().Field(i).Type.String()
+		nf.fieldName = fmt.Sprintf(`f%v#%v`, i, fieldName)
+		nf.fieldType = v.Type().Elem().Field(i).Type.String()
 		_ = pkgPath
 		if field.Kind() != reflect.Interface && field.Kind() != reflect.Ptr {
 			continue
@@ -357,7 +357,7 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool) {
 		if ok && name != "" { // struct tag inject:name:hello
 			if value, ok := gdi.getByName(name); ok {
 				//n.addEdge(&edge{from: nf.fieldType, to: value.Type().String()})
-				n.addEdge(&edge{from: fmt.Sprintf(`"%v":f%v`, v.Type().String(),i), to: value.Type().String()})
+				n.addEdge(&edge{from: fmt.Sprintf(`"%v":f%v`, v.Type().String(), i), to: value.Type().String()})
 				field.Set(value)
 				gdi.injectLog(fieldName, field, v, pkgPath, logLevelInfo)
 			} else {
@@ -371,7 +371,7 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool) {
 			if im, err := gdi.getByInterface(field.Type(), fieldName, v); err == nil {
 				field.Set(im)
 				//n.addEdge(&edge{from: fmt.Sprintf("%v:f%v", nf.fieldType,i), to: im.Type().String()})
-				n.addEdge(&edge{from: fmt.Sprintf(`"%v":f%v`, v.Type().String(),i), to: im.Type().String()})
+				n.addEdge(&edge{from: fmt.Sprintf(`"%v":f%v`, v.Type().String(), i), to: im.Type().String()})
 				gdi.injectLog(fieldName, field, v, pkgPath, logLevelInfo)
 				continue
 			} else {
@@ -398,7 +398,7 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool) {
 		if im, ok := gdi.get(field.Type()); ok { // by type
 			field.Set(im)
 			//n.addEdge(&edge{from: nf.fieldType, to: im.Type().String()})
-			n.addEdge(&edge{from: fmt.Sprintf(`"%v":f%v`, v.Type().String(),i), to: im.Type().String()})
+			n.addEdge(&edge{from: fmt.Sprintf(`"%v":f%v`, v.Type().String(), i), to: im.Type().String()})
 			//n.addFiled(nf)
 			gdi.injectLog(fieldName, field, v, pkgPath, logLevelInfo)
 			continue
@@ -407,7 +407,7 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool) {
 				value := reflect.New(field.Type().Elem())
 				field.Set(value)
 				//n.addEdge(&edge{from: nf.fieldType, to: value.Type().String()})
-				n.addEdge(&edge{from: fmt.Sprintf(`"%v":f%v`, v.Type().String(),i), to: value.Type().String()})
+				n.addEdge(&edge{from: fmt.Sprintf(`"%v":f%v`, v.Type().String(), i), to: value.Type().String()})
 				gdi.injectLog(fieldName, field, v, pkgPath, logLevelInfo)
 				gdi.warn(fmt.Sprintf("\u001B[1;35mautoCreate\u001B[0m type:%v fieldName:%v of %v", field.Type(), fieldName, v.Type()))
 				gdi.set(field.Type(), value.Interface())
@@ -471,7 +471,7 @@ func (gdi *GDIPool) Debug(isDebug bool) {
 	gdi.debug = isDebug
 }
 
-func  Graph() string {
+func Graph() string {
 	return globalGDI.Graph()
 }
 
@@ -686,7 +686,7 @@ tag:
 		goto tag
 	}
 
-	return reflect.Value{}, fmt.Errorf("interface type:%v not found.please use gdi.MapToImplement to set Interface->Implements", i.Name())
+	return reflect.Value{}, fmt.Errorf("interface type:%v fieldName:%v of %v not found.please use gdi.MapToImplement to set Interface->Implements", i.Name(), fieldName, v)
 }
 
 func (gdi *GDIPool) getByName(name string) (result reflect.Value, ok bool) {
