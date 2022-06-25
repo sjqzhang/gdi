@@ -29,6 +29,7 @@ type GDIPool struct {
 	debug                 bool
 	scanPkgPaths          []string
 	ignoreInterface       bool
+	ignorePrivate         bool
 	creator               map[reflect.Type]interface{}
 	creatorLocker         sync.RWMutex
 	typeToValuesReadOnly  map[reflect.Type]reflect.Value
@@ -56,6 +57,7 @@ func NewGDIPool() *GDIPool {
 		scanPkgPaths:          []string{modName},
 		ignoreInterface:       false,
 		autoCreate:            true,
+		ignorePrivate:         false,
 		creator:               make(map[reflect.Type]interface{}),
 		creatorLocker:         sync.RWMutex{},
 		allTypesToValues:      make(map[reflect.Type]reflect.Value),
@@ -100,6 +102,11 @@ func AutoCreate(autoCreate bool) {
 	globalGDI.AutoCreate(autoCreate)
 }
 
+// IgnorePrivate 是否对非公开属性进行注入？
+func IgnorePrivate(isIgnorePrivate bool) {
+	globalGDI.ignorePrivate = isIgnorePrivate
+}
+
 // Get 通过类型或名称从容器中获取对象
 func Get(t interface{}) (value interface{}) {
 	return globalGDI.Get(t)
@@ -141,6 +148,10 @@ func Init() {
 //ScanPkgPaths deprecated
 func (gdi *GDIPool) ScanPkgPaths(scanPaths ...string) {
 	gdi.scanPkgPaths = append(gdi.scanPkgPaths, scanPaths...)
+}
+
+func (gdi *GDIPool) IgnorePrivate(isIgnorePrivate bool) {
+	gdi.ignorePrivate = isIgnorePrivate
 }
 
 //Register 用于注册自己的业务代码
@@ -351,6 +362,9 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool) {
 			continue
 		}
 		if !field.CanSet() {
+			if gdi.ignorePrivate {
+				continue
+			}
 			field = reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
 		}
 		name, ok := gdi.getTagAttr(v.Type().Elem().Field(i), "name")
