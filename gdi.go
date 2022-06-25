@@ -363,6 +363,7 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool) {
 		}
 		if !field.CanSet() {
 			if gdi.ignorePrivate {
+				gdi.warn(fmt.Sprintf("\u001B[1;31mignore type:%v fieldName:%v of %v pkgPath:%v\u001B[0m", field.Type(), fieldName, v.Type(), pkgPath))
 				continue
 			}
 			field = reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
