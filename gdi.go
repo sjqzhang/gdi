@@ -370,6 +370,10 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool) {
 		}
 		name, ok := gdi.getTagAttr(v.Type().Elem().Field(i), "name")
 		if ok && name != "" { // struct tag inject:name:hello
+			if name=="-" || name =="_" {
+				gdi.warn(fmt.Sprintf("inject fieldName:%v->%v of %v pkgPath:%v", fieldName, field.Type(), v.Type(), pkgPath))
+				continue
+			}
 			if value, ok := gdi.getByName(name); ok {
 				//n.addEdge(&edge{from: nf.fieldType, to: value.Type().String()})
 				n.addEdge(&edge{from: fmt.Sprintf(`"%v":f%v`, v.Type().String(), i), to: value.Type().String()})
