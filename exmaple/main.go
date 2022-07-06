@@ -68,6 +68,7 @@ type II struct {
 
 type Q struct {
 
+
 	//a *AA
 }
 
@@ -182,7 +183,7 @@ func init() {
 
 }
 
-func main() {
+func main2() {
 
 
 

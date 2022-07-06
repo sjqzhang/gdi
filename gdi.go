@@ -32,6 +32,7 @@ type GDIPool struct {
 	ignorePrivate         bool
 	creator               map[reflect.Type]interface{}
 	creatorLocker         sync.RWMutex
+	typeToValuesForTest   map[reflect.Type]reflect.Value
 	typeToValuesReadOnly  map[reflect.Type]reflect.Value
 	typeToValues          map[reflect.Type]reflect.Value
 	allTypesToValues      map[reflect.Type]reflect.Value
@@ -61,6 +62,7 @@ func NewGDIPool() *GDIPool {
 		creator:               make(map[reflect.Type]interface{}),
 		creatorLocker:         sync.RWMutex{},
 		allTypesToValues:      make(map[reflect.Type]reflect.Value),
+		typeToValuesForTest:   make(map[reflect.Type]reflect.Value),
 		typeToValues:          make(map[reflect.Type]reflect.Value),
 		typeToValuesReadOnly:  make(map[reflect.Type]reflect.Value),
 		namesToValues:         make(map[string]reflect.Value),
@@ -120,6 +122,11 @@ func Invoke(t interface{}) (interface{}, error) {
 // DI 自动依懒注入
 func DI(pointer interface{}) error {
 	return globalGDI.DI(pointer)
+}
+
+// DI 自动依懒注入
+func DIForTest(pointer interface{}) error {
+	return globalGDI.DIForTest(pointer)
 }
 
 // MapToImplement 设定接品与实现的映射关系 Example：gdi.MapToImplement(&AA{},&Q{}
@@ -268,10 +275,10 @@ func (gdi *GDIPool) Init() *GDIPool {
 	}
 
 	for _, v := range gdi.typeToValues {
-		gdi.build(v, true)
+		gdi.build(v, true, false)
 	}
 	for _, v := range gdi.namesToValues {
-		gdi.build(v, true)
+		gdi.build(v, true, false)
 	}
 	//if err:=gdi.checkPoolNil();err!=nil {
 	//	panic(err)
@@ -342,7 +349,7 @@ func (gdi *GDIPool) injectLog(fieldName string, field reflect.Value, vStruct ref
 	}
 }
 
-func (gdi *GDIPool) build(v reflect.Value, exitOnError bool) {
+func (gdi *GDIPool) build(v reflect.Value, exitOnError bool, buildForTest bool) {
 	if v.Elem().Kind() != reflect.Struct {
 		return
 	}
@@ -368,9 +375,19 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool) {
 			}
 			field = reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
 		}
+		if field.IsValid() && !field.IsNil() {
+			//TODO may be pannic
+			if field.Elem().Kind() == reflect.Struct {
+				if _, ok := gdi.typeToValuesForTest[field.Type()]; !ok {
+					gdi.warn(fmt.Sprintf("Register field type %v from %v pkgPath:%v", field.Type(), v.Type(), pkgPath))
+					gdi.typeToValuesForTest[field.Type()] = field
+				}
+			}
+			continue
+		}
 		name, ok := gdi.getTagAttr(v.Type().Elem().Field(i), "name")
 		if ok && name != "" { // struct tag inject:name:hello
-			if name=="-" || name =="_" {
+			if name == "-" || name == "_" {
 				gdi.warn(fmt.Sprintf("inject fieldName:%v->%v of %v pkgPath:%v", fieldName, field.Type(), v.Type(), pkgPath))
 				continue
 			}
@@ -422,6 +439,13 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool) {
 			gdi.injectLog(fieldName, field, v, pkgPath, logLevelInfo)
 			continue
 		} else {
+			if buildForTest {
+				if fv, ok := gdi.typeToValuesForTest[field.Type()]; ok {
+					gdi.warn(fmt.Sprintf("inject For Test fieldName:%v->%v of %v pkgPath:%v", fieldName, field.Type(), v.Type(), pkgPath))
+					field.Set(fv)
+					continue
+				}
+			}
 			if gdi.autoCreate {
 				value := reflect.New(field.Type().Elem())
 				field.Set(value)
@@ -430,9 +454,10 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool) {
 				gdi.injectLog(fieldName, field, v, pkgPath, logLevelInfo)
 				gdi.warn(fmt.Sprintf("\u001B[1;35mautoCreate\u001B[0m type:%v fieldName:%v of %v", field.Type(), fieldName, v.Type()))
 				gdi.set(field.Type(), value.Interface())
-				gdi.build(value, exitOnError)
+				gdi.build(value, exitOnError, buildForTest)
 			}
 		}
+
 		if field.IsNil() {
 			if exitOnError {
 				gdi.injectLog(fieldName, field, v, pkgPath, logLevelExit)
@@ -518,6 +543,30 @@ func (gdi *GDIPool) GetAllTypes() []reflect.Type {
 	return tys
 }
 
+// DIForTest 自动依懒注入
+func (gdi *GDIPool) DIForTest(pointer interface{}) (e error) {
+	defer func() {
+		if err := recover(); err != nil {
+			gdi.warn(fmt.Sprintf("%v", err))
+			e = fmt.Errorf(fmt.Sprintf("%v", err))
+		}
+	}()
+	var result reflect.Value
+	ftype := reflect.TypeOf(pointer)
+	if ftype.Kind() != reflect.Ptr {
+		return errors.New("(ERROR) pointer type require")
+	}
+	result = reflect.ValueOf(pointer)
+	if result.IsNil() {
+		return errors.New("(ERROR) pointer is null ")
+	}
+	if result.Elem().Kind() != reflect.Struct {
+		return errors.New("(ERROR) must be a struct pointer")
+	}
+	gdi.build(result, false, true)
+	return e
+}
+
 // DI 自动依懒注入
 func (gdi *GDIPool) DI(pointer interface{}) (e error) {
 	defer func() {
@@ -535,7 +584,7 @@ func (gdi *GDIPool) DI(pointer interface{}) (e error) {
 	if result.IsNil() {
 		return errors.New("(ERROR) pointer is null ")
 	}
-	gdi.build(result, false)
+	gdi.build(result, false, false)
 	return e
 }
 
