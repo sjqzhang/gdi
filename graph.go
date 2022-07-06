@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"strings"
 )
-
-var g *graph
-
-func init() {
-	g = &graph{
-		nodes: make(map[string]*node),
-	}
-}
+//
+//var g *graph
+//
+//func init() {
+//	g = &graph{
+//		nodes: make(map[string]*node),
+//	}
+//}
 
 type node struct {
 	name     string
@@ -52,9 +52,9 @@ func (n *node) addEdge(e *edge) {
 	n.edges = append(n.edges, e)
 }
 
-func (g *graph) add(n *node) {
-	if _,ok:= g.nodes[n.name];!ok {
-		g.nodes[n.name] = n
+func (gdi *GDIPool) addNode(n *node) {
+	if _,ok:= gdi.g.nodes[n.name];!ok {
+		gdi.g.nodes[n.name] = n
 	}
 }
 
@@ -79,7 +79,7 @@ rankdir=LR;
   %v
 }
 `
-	for _, n := range g.nodes {
+	for _, n := range gdi.g.nodes {
 		var fields []string
 		fields = append(fields, fmt.Sprintf(`<table BORDER="1" CELLBORDER="1" CELLSPACING="0"><tr><td PORT="f100"><font POINT-SIZE="18"><b>struct %v</b></font></td></tr>`, n.name))
 		for _, field := range n.fields {

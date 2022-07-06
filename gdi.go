@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/sjqzhang/gdi/tl"
+	"io/ioutil"
 	"log"
 	"os"
 	"reflect"
@@ -39,6 +40,7 @@ type GDIPool struct {
 	namesToValues         map[string]reflect.Value
 	namesToValuesReadOnly map[string]reflect.Value
 	interfaceToImplements map[string]string
+	g                     *graph
 
 	ttvLocker  sync.RWMutex
 	autoCreate bool
@@ -69,7 +71,9 @@ func NewGDIPool() *GDIPool {
 		namesToValuesReadOnly: make(map[string]reflect.Value),
 		interfaceToImplements: make(map[string]string),
 		ttvLocker:             sync.RWMutex{},
+		g:                     &graph{},
 	}
+	pool.g.nodes = map[string]*node{}
 	for _, t := range GetAllTypes() {
 		pool.allTypesToValues[t] = reflect.ValueOf(nil)
 	}
@@ -355,7 +359,7 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool, buildForTest bool) 
 	}
 	n := &node{}
 	n.name = v.Type().String()
-	g.add(n)
+	gdi.addNode(n)
 	for i := 0; i < v.Elem().NumField(); i++ {
 		nf := &nodeItem{}
 		n.addFiled(nf)
@@ -379,7 +383,7 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool, buildForTest bool) 
 			//TODO may be pannic
 			if field.Elem().Kind() == reflect.Struct {
 				if _, ok := gdi.typeToValuesForTest[field.Type()]; !ok {
-					gdi.warn(fmt.Sprintf("Register field type %v from %v pkgPath:%v", field.Type(), v.Type(), pkgPath))
+					gdi.log(fmt.Sprintf("Register field type %v from %v pkgPath:%v", field.Type(), v.Type(), pkgPath))
 					gdi.typeToValuesForTest[field.Type()] = field
 				}
 			}
@@ -396,6 +400,7 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool, buildForTest bool) 
 				n.addEdge(&edge{from: fmt.Sprintf(`"%v":f%v`, v.Type().String(), i), to: value.Type().String()})
 				field.Set(value)
 				gdi.injectLog(fieldName, field, v, pkgPath, logLevelInfo)
+				continue
 			} else {
 				gdi.panic(fmt.Sprintf("name:%v type:%v object not found", name, field.Type()))
 			}
@@ -517,6 +522,10 @@ func (gdi *GDIPool) Debug(isDebug bool) {
 
 func Graph() string {
 	return globalGDI.Graph()
+}
+
+func SaveGraphToFile(fpath string) error {
+	return globalGDI.SaveGraphToFile(fpath)
 }
 
 //Debug 是否开启调试信息
@@ -913,4 +922,8 @@ func (gdi *GDIPool) parsePoolFunc(f interface{}) (outType reflect.Type, e error)
 		return
 	}
 	return
+}
+
+func (gdi *GDIPool) SaveGraphToFile(fpath string) error {
+	return ioutil.WriteFile(fpath, []byte(gdi.Graph()), 0777)
 }

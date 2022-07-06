@@ -1,7 +1,6 @@
 package gdi
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -125,17 +124,38 @@ type A struct {
 }
 
 func TestAll3(t *testing.T) {
-	Debug(true)
-	Register(&Person{Name: "hello world"})
+	type Student struct {
+		Name string
+		Age  int
+	}
 
+	type Class struct {
+		Student *Student
+	}
+
+	type BQ struct {
+		Student *Student
+	}
+
+	c := Class{
+		Student: &Student{
+			Name: "jqzhang",
+			Age: 20,
+		},
+	}
+
+	var s BQ
+
+	_=s
+
+	Register(&c)
 	Init()
 
-    var a A
+	DIForTest(&s)
 
-	DI(&a)
-	a.p.addr.Email="xxx"
-
-	fmt.Println(a.p.addr.Email)
+	if s.Student.Name!=c.Student.Name {
+		t.Fail()
+	}
 
 
 
