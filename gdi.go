@@ -71,7 +71,7 @@ func NewGDIPool() *GDIPool {
 		namesToValuesReadOnly: make(map[string]reflect.Value),
 		interfaceToImplements: make(map[string]string),
 		ttvLocker:             sync.RWMutex{},
-		g:                     &graph{},
+		g:                     &graph{lock: sync.Mutex{}},
 	}
 	pool.g.nodes = map[string]*node{}
 	for _, t := range GetAllTypes() {

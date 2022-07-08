@@ -3,7 +3,9 @@ package gdi
 import (
 	"fmt"
 	"strings"
+	"sync"
 )
+
 //
 //var g *graph
 //
@@ -14,9 +16,9 @@ import (
 //}
 
 type node struct {
-	name     string
-	fields   []*nodeItem
-	edges    []*edge
+	name   string
+	fields []*nodeItem
+	edges  []*edge
 	//fieldMap map[string]struct{}
 	//fields map[string]string
 	//edges  map[string]string
@@ -33,6 +35,7 @@ type nodeItem struct {
 }
 
 type graph struct {
+	lock  sync.Mutex
 	nodes map[string]*node
 }
 
@@ -53,7 +56,9 @@ func (n *node) addEdge(e *edge) {
 }
 
 func (gdi *GDIPool) addNode(n *node) {
-	if _,ok:= gdi.g.nodes[n.name];!ok {
+	gdi.g.lock.Lock()
+	defer  gdi.g.lock.Unlock()
+	if _, ok := gdi.g.nodes[n.name]; !ok {
 		gdi.g.nodes[n.name] = n
 	}
 }
@@ -72,7 +77,7 @@ func (gdi *GDIPool) Graph() string {
      shape = "none"
  ]
 `
-	gTpl:=`
+	gTpl := `
 digraph { 
 
 rankdir=LR;
@@ -83,8 +88,8 @@ rankdir=LR;
 		var fields []string
 		fields = append(fields, fmt.Sprintf(`<table BORDER="1" CELLBORDER="1" CELLSPACING="0"><tr><td PORT="f100"><font POINT-SIZE="18"><b>struct %v</b></font></td></tr>`, n.name))
 		for _, field := range n.fields {
-			ns:=strings.Split(field.fieldName,"#")
-			fields = append(fields, fmt.Sprintf(`<tr><td PORT="%v">%v %v</td></tr>`,  ns[0],ns[1], field.fieldType))
+			ns := strings.Split(field.fieldName, "#")
+			fields = append(fields, fmt.Sprintf(`<tr><td PORT="%v">%v %v</td></tr>`, ns[0], ns[1], field.fieldType))
 		}
 		gs = append(gs, fmt.Sprintf(nodeTpl, n.name, strings.Join(fields, "")+"</table>"))
 		var edges []string
