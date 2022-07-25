@@ -409,7 +409,7 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool, buildForTest bool) 
 			if !field.IsNil() {
 				continue
 			}
-			if im, err := gdi.getByInterface(field.Type(), fieldName, v); err == nil {
+			if im, err := gdi.getByInterface(field.Type(), fieldName, v,exitOnError,buildForTest); err == nil {
 				field.Set(im)
 				//n.addEdge(&edge{from: fmt.Sprintf("%v:f%v", nf.fieldType,i), to: im.Type().String()})
 				n.addEdge(&edge{from: fmt.Sprintf(`"%v":f%v`, v.Type().String(), i), to: im.Type().String()})
