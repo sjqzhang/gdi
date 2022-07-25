@@ -711,7 +711,7 @@ func (gdi *GDIPool) MapToImplement(pkgToFieldInteface interface{}, pkgImplement 
 	return nil
 }
 
-func (gdi *GDIPool) getByInterface(i reflect.Type, fieldName string, v reflect.Value) (value reflect.Value, err error) {
+func (gdi *GDIPool) getByInterface(i reflect.Type, fieldName string, v reflect.Value,exitOnError bool, buildForTest bool) (value reflect.Value, err error) {
 tag:
 	cnt := 0
 	var values []reflect.Value
@@ -754,7 +754,9 @@ tag:
 				value = reflect.New(t.Elem())
 				gdi.warn(fmt.Sprintf("\u001B[1;35mautoCreate\u001B[0m  type:%v fieldName:%v of %v", t, fieldName, v.Type()))
 				gdi.set(t, value.Interface())
+				gdi.build(value,exitOnError,buildForTest)
 				bflag = true
+
 				//return value, nil
 			}
 		}
