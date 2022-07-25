@@ -1,16 +1,21 @@
 ## golang 依赖注入包(Golang Dependency Injection) 简称：GDI
+
 ## 原理
+
 通过golang 的 init方法进行对象注册，使用反射技术对为空的指针对象进行赋值，完成对象的组装。
 
 ## 注意事项
+
 - 注册对象必须写在init方法中(开启自动创建时可以不写)
 - 对象的类型必须是指针类型(接口类型除外)
 - 最后一定要调用 gdi.Init() 方法
 - 只支持单例实例，且只按类型进行反射注入
 - 只能能过指针参数获取对象
 - 构建后的对可以直接进行类型转换,参阅示例
+- 如何要开启自动创建功能需增加 `gcflags=all=-l` 编译选项.举例：`go build/run/test gcflags=all=-l`
 
 ## 注册对象的几种方式
+
 ```golang
 	gdi.Register(
 		&AA{},//直接实例化对象（方式一）
@@ -29,9 +34,11 @@
 ```
 
 ## 如何安装
+
 `go get -u github.com/sjqzhang/gdi`
 
 ## 使用示例
+
 ```golang
 package main
 
