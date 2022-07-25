@@ -409,7 +409,7 @@ func (gdi *GDIPool) build(v reflect.Value, exitOnError bool, buildForTest bool) 
 			if !field.IsNil() {
 				continue
 			}
-			if im, err := gdi.getByInterface(field.Type(), fieldName, v,exitOnError,buildForTest); err == nil {
+			if im, err := gdi.getByInterface(field.Type(), fieldName, v, exitOnError, buildForTest); err == nil {
 				field.Set(im)
 				//n.addEdge(&edge{from: fmt.Sprintf("%v:f%v", nf.fieldType,i), to: im.Type().String()})
 				n.addEdge(&edge{from: fmt.Sprintf(`"%v":f%v`, v.Type().String(), i), to: im.Type().String()})
@@ -711,7 +711,7 @@ func (gdi *GDIPool) MapToImplement(pkgToFieldInteface interface{}, pkgImplement 
 	return nil
 }
 
-func (gdi *GDIPool) getByInterface(i reflect.Type, fieldName string, v reflect.Value,exitOnError bool, buildForTest bool) (value reflect.Value, err error) {
+func (gdi *GDIPool) getByInterface(i reflect.Type, fieldName string, v reflect.Value, exitOnError bool, buildForTest bool) (value reflect.Value, err error) {
 tag:
 	cnt := 0
 	var values []reflect.Value
@@ -754,7 +754,7 @@ tag:
 				value = reflect.New(t.Elem())
 				gdi.warn(fmt.Sprintf("\u001B[1;35mautoCreate\u001B[0m  type:%v fieldName:%v of %v", t, fieldName, v.Type()))
 				gdi.set(t, value.Interface())
-				gdi.build(value,exitOnError,buildForTest)
+				gdi.build(value, exitOnError, buildForTest)
 				bflag = true
 
 				//return value, nil
@@ -765,7 +765,7 @@ tag:
 		goto tag
 	}
 
-	return reflect.Value{}, fmt.Errorf("interface type:%v fieldName:%v of %v not found.please use gdi.MapToImplement to set Interface->Implements", i.Name(), fieldName, v)
+	return reflect.Value{}, fmt.Errorf("interface type:%v fieldName:%v of %v not found. add gcflags flag for build, for example: go build gcflags=all=-l", i.Name(), fieldName, v)
 }
 
 func (gdi *GDIPool) getByName(name string) (result reflect.Value, ok bool) {
