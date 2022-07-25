@@ -765,7 +765,7 @@ tag:
 		goto tag
 	}
 
-	return reflect.Value{}, fmt.Errorf("interface type:%v fieldName:%v of %v not found. add gcflags flag for build or run, for example: \u001B[1;33m go build gcflags=all=-l\u001B[0m", i.Name(), fieldName, v)
+	return reflect.Value{}, fmt.Errorf("interface type:%v fieldName:%v of %v not found. add \u001B[1;33m gcflags=all=-l\u001B[0m flag for build or run, for example: \u001B[1;33m go build gcflags=all=-l\u001B[0m", i.Name(), fieldName, v)
 }
 
 func (gdi *GDIPool) getByName(name string) (result reflect.Value, ok bool) {
