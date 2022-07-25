@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync"
 	"unsafe"
@@ -141,6 +142,11 @@ func MapToImplement(pkgToFieldInteface interface{}, pkgImplement interface{}) er
 //GetAllTypes 获取所有类型
 func GetAllTypes() []reflect.Type {
 	return globalGDI.GetAllTypes()
+}
+
+//GetAllTypesByPackName 根据正则获取所有类型
+func GetAllTypesByPackName(packageRegexp string) ([]reflect.Type, error) {
+	return globalGDI.GetAllTypesByPackName(packageRegexp)
 }
 
 //GetWithCheck 从容器中获取值
@@ -552,6 +558,23 @@ func (gdi *GDIPool) GetAllTypes() []reflect.Type {
 	return tys
 }
 
+//GetAllTypes 获取所有类型
+func (gdi *GDIPool) GetAllTypesByPackName(packageRegexp string) ([]reflect.Type, error) {
+	var ts []reflect.Type
+	reg, err := regexp.Compile(packageRegexp)
+	if err != nil {
+		return nil, err
+	}
+	types := gdi.GetAllTypes()
+	for _, t := range types {
+		if reg.MatchString(t.String()) {
+			ts = append(ts, t)
+		}
+	}
+	return ts, nil
+
+}
+
 // DIForTest 自动依懒注入
 func (gdi *GDIPool) DIForTest(pointer interface{}) (e error) {
 	defer func() {
@@ -765,7 +788,7 @@ tag:
 		goto tag
 	}
 
-	return reflect.Value{}, fmt.Errorf("interface type:%v fieldName:%v of %v not found. add \u001B[1;33m gcflags=all=-l\u001B[0m flag for build or run, for example: \u001B[1;33m go build gcflags=all=-l\u001B[0m", i.Name(), fieldName, v)
+	return reflect.Value{}, fmt.Errorf("interface type:%v fieldName:%v of %v not found. use \u001B[1;33m gdi.Register(&YourStruct{})\u001B[0m register first", i.Name(), fieldName, v.Type())
 }
 
 func (gdi *GDIPool) getByName(name string) (result reflect.Value, ok bool) {
