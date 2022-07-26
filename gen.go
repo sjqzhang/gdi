@@ -45,7 +45,7 @@ func getGoSources() map[string][]string {
 	packages:=getAllPackages()
 	reg := regexp.MustCompile(`package\s+main\s*$`)
 	comment := regexp.MustCompile(`/\*{1,2}[\s\S]*?\*/|//[\s\S]*?\n`) //remove comment
-	regBrackets := regexp.MustCompile(`{[^{|}]+}`)                    //remove {}
+	regBrackets := regexp.MustCompile("`[^`]+?`|{[^{|}]*}")                    //remove {}
 	goFiles := make(map[string][]string)
 	baseDir := strings.TrimSpace(getDir())
 	for _, p := range packages {
