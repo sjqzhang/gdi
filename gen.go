@@ -9,6 +9,7 @@ import (
 	"path"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 )
 
@@ -126,6 +127,8 @@ func init() {
 }
 
 `
+
+	sort.Strings(aliasPack)
 
 	importPackages := strings.Join(aliasPack, "\n")
 	registerFun := strings.Join(regFuncs, "\n")
