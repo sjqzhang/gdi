@@ -99,7 +99,7 @@ func genDependency() string {
 			for _, m := range matches {
 				if len(m) == 2 {
 					bflag = true
-					regFuncs = append(regFuncs, fmt.Sprintf("gdi.Register(&p%v.%v{})", index, m[1]))
+					regFuncs = append(regFuncs, fmt.Sprintf("gdi.PlaceHolder(p%v.%v{})", index, m[1]))
 				}
 			}
 		}
@@ -116,7 +116,7 @@ import (
 )
 
 func init() {
-    _=gdi
+     _=gdi.GDIPool{}
 	%v
 }
 

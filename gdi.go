@@ -41,6 +41,7 @@ type GDIPool struct {
 	namesToValues         map[string]reflect.Value
 	namesToValuesReadOnly map[string]reflect.Value
 	interfaceToImplements map[string]string
+	placeHolders          map[string]interface{}
 	g                     *graph
 
 	ttvLocker  sync.RWMutex
@@ -73,6 +74,7 @@ func NewGDIPool() *GDIPool {
 		interfaceToImplements: make(map[string]string),
 		ttvLocker:             sync.RWMutex{},
 		g:                     &graph{lock: sync.Mutex{}},
+		placeHolders:          make(map[string]interface{}),
 	}
 	pool.g.nodes = map[string]*node{}
 	for _, t := range GetAllTypes() {
@@ -84,6 +86,12 @@ func NewGDIPool() *GDIPool {
 //Register 用于注册自己的业务代码
 func Register(funcObjOrPtrs ...interface{}) {
 	globalGDI.Register(funcObjOrPtrs...)
+
+}
+
+//PlaceHolder 用于占位符用
+func PlaceHolder(funcObjOrPtrs ...interface{}) {
+	globalGDI.PlaceHolder(funcObjOrPtrs...)
 
 }
 
@@ -951,4 +959,12 @@ func (gdi *GDIPool) parsePoolFunc(f interface{}) (outType reflect.Type, e error)
 
 func (gdi *GDIPool) SaveGraphToFile(fpath string) error {
 	return ioutil.WriteFile(fpath, []byte(gdi.Graph()), 0777)
+}
+
+func (gdi *GDIPool) PlaceHolder(objs ...interface{}) {
+	gdi.creatorLocker.Lock()
+	defer gdi.creatorLocker.Unlock()
+	for _, obj := range objs {
+		gdi.placeHolders[reflect.TypeOf(obj).String()] = obj
+	}
 }
