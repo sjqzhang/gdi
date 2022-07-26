@@ -74,7 +74,7 @@ func getGoSources() map[string][]string {
 					continue
 				}
 				source = comment.ReplaceAllString(source, "")
-				for i := 0; i < 15; i++ {
+				for i := 0; i < 100; i++ {
 					old := len(source)
 					source = regBrackets.ReplaceAllString(source, "")
 					if len(source) == old {
