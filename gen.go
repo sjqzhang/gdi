@@ -43,6 +43,7 @@ func getGoSources() map[string][]string {
 	packagePath := strings.TrimSpace(runCmd("go", "list", "-f", "{{.ImportPath}}"))
 	packages := getAllPackages()
 	reg := regexp.MustCompile(`package\s+main\s*$`)
+	comment := regexp.MustCompile(`^\/\*.*?\*\/$|^\/\/.*?[\r\n]|\{.*?\}`)
 	goFiles := make(map[string][]string)
 	baseDir := strings.TrimSpace(getDir())
 	for _, p := range packages {
@@ -70,6 +71,7 @@ func getGoSources() map[string][]string {
 				if reg.MatchString(lines[0]) {
 					continue
 				}
+				source = comment.ReplaceAllString(source, "")
 				gos = append(gos, source)
 			}
 
