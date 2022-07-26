@@ -47,17 +47,13 @@ func TestAll(t *testing.T) {
 	var g2 *gdiTest2
 
 	type Inner struct {
-		g *gdiTest
+		g  *gdiTest
 		g2 *gdiTest2
 	}
 
 	var i Inner
 
 	gp.DI(&i)
-
-
-
-
 
 	if gp.Get(g).(*gdiTest).Name != name {
 		t.Fail()
@@ -78,7 +74,6 @@ func TestAll(t *testing.T) {
 func TestAll2(t *testing.T) {
 
 	name := "gdi"
-
 
 	Register(&gdiTest{
 		Name: name,
@@ -140,24 +135,32 @@ func TestAll3(t *testing.T) {
 	c := Class{
 		Student: &Student{
 			Name: "jqzhang",
-			Age: 20,
+			Age:  20,
 		},
 	}
 
 	var s BQ
 
-	_=s
+	_ = s
 
 	Register(&c)
 	Init()
 
 	DIForTest(&s)
 
-	if s.Student.Name!=c.Student.Name {
+	if s.Student.Name != c.Student.Name {
 		t.Fail()
 	}
 
+}
+
+func TestGetAllPackages(t *testing.T) {
 
 
+	//getAllPackages()
+	//genDependency()
 
+	if genDependency()=="" {
+		t.Fail()
+	}
 }

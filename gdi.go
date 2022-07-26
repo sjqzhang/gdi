@@ -788,7 +788,7 @@ tag:
 		goto tag
 	}
 
-	return reflect.Value{}, fmt.Errorf("interface type:%v fieldName:%v of %v not found. use \u001B[1;33m gdi.Register(&YourStruct{})\u001B[0m register first", i.Name(), fieldName, v.Type())
+	return reflect.Value{}, fmt.Errorf("interface type:%v fieldName:%v of %v not found. use \u001B[1;33m gdi.Register(&YourStruct{})  \u001B[0m or \u001B[1;33m gdi.GenGDIRegisterFile(false)  \u001B[0m register first ", i.Name(), fieldName, v.Type())
 }
 
 func (gdi *GDIPool) getByName(name string) (result reflect.Value, ok bool) {
