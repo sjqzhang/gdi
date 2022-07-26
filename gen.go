@@ -40,7 +40,9 @@ func getDir() string {
 }
 
 func getGoSources() map[string][]string {
-	packagePath := strings.TrimSpace(runCmd("go", "list", "-f", "{{.ImportPath}}"))
+	entry:=getCurrentAbPathByCaller()
+	entry=path.Dir(entry)
+	packagePath := strings.TrimSpace(runCmd("cd",entry,"|","go", "list", "-f", "{{.ImportPath}}"))
 	packages := getAllPackages()
 	reg := regexp.MustCompile(`package\s+main\s*$`)
 	comment := regexp.MustCompile(`^\/\*.*?\*\/$|^\/\/.*?[\r\n]|\{.*?\}`)
