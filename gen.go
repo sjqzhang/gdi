@@ -112,9 +112,11 @@ func genDependency() string {
 
 import (
 	%v
+	"github.com/sjqzhang/gdi"
 )
 
 func init() {
+    _=gdi
 	%v
 }
 
