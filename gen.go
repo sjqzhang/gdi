@@ -40,11 +40,8 @@ func getDir() string {
 }
 
 func getGoSources() map[string][]string {
-	packagePath := ""
-	packages := getAllPackages()
-	if len(packages) > 0 {
-		packagePath = strings.Split(packages[0], "/")[0]
-	}
+	packagePath := runCmd("go","list","-f","{{.Module}}","./...")
+	packagePath=strings.Split(packagePath,"\n")[0]
 	reg := regexp.MustCompile(`package\s+main\s*$`)
 	comment := regexp.MustCompile(`/\*{1,2}[\s\S]*?\*/|//[\s\S]*?\n`) //remove comment
 	regBrackets := regexp.MustCompile(`{[^{|}]+}`)                    //remove {}
