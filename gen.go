@@ -167,5 +167,7 @@ func (gdi *GDIPool) GenGDIRegisterFile(override bool) {
 			ioutil.WriteFile(fn, []byte(source), 0755)
 		}
 	}
+	runCmd("gofmt","-w",fn)
+
 
 }
