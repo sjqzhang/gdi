@@ -91,10 +91,18 @@ func getGoSources() map[string][]string {
 func genDependency() string {
 	packages := getGoSources()
 	reg := regexp.MustCompile(`type\s+([A-Z]\w+)\s+struct`)
+
 	var aliasPack []string
+	var allPacks []string
+	for p,_:=range packages {
+		allPacks=append(allPacks,p)
+
+	}
+	sort.Strings(allPacks)
 	var regFuncs []string
 	index := 0
-	for p, sources := range packages {
+	for _, p := range allPacks {
+		sources:= packages[p]
 		if len(sources) == 0 {
 			continue
 		}
