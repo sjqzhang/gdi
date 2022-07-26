@@ -29,7 +29,6 @@ func getAllPackages() []string {
 
 	packages := runCmd("go", "list", "./...")
 
-	//fmt.Println(packages)
 
 	return strings.Split(packages, "\n")
 }
@@ -47,7 +46,8 @@ func getGoSources() map[string][]string {
 		packagePath = strings.Split(packages[0], "/")[0]
 	}
 	reg := regexp.MustCompile(`package\s+main\s*$`)
-	comment := regexp.MustCompile(`/\*{1,2}[\s\S]*?\*/|//[\s\S]*?\n`)
+	comment := regexp.MustCompile(`/\*{1,2}[\s\S]*?\*/|//[\s\S]*?\n`) //remove comment
+	regBrackets := regexp.MustCompile(`{[^{|}]+}`)                    //remove {}
 	goFiles := make(map[string][]string)
 	baseDir := strings.TrimSpace(getDir())
 	for _, p := range packages {
@@ -76,6 +76,13 @@ func getGoSources() map[string][]string {
 					continue
 				}
 				source = comment.ReplaceAllString(source, "")
+				for i := 0; i < 15; i++ {
+					old := len(source)
+					source = regBrackets.ReplaceAllString(source, "")
+					if len(source) == old {
+						break
+					}
+				}
 				gos = append(gos, source)
 			}
 
@@ -94,15 +101,15 @@ func genDependency() string {
 
 	var aliasPack []string
 	var allPacks []string
-	for p,_:=range packages {
-		allPacks=append(allPacks,p)
+	for p, _ := range packages {
+		allPacks = append(allPacks, p)
 
 	}
 	sort.Strings(allPacks)
 	var regFuncs []string
 	index := 0
 	for _, p := range allPacks {
-		sources:= packages[p]
+		sources := packages[p]
 		if len(sources) == 0 {
 			continue
 		}
@@ -136,7 +143,6 @@ func init() {
 
 `
 
-
 	importPackages := strings.Join(aliasPack, "\n")
 	registerFun := strings.Join(regFuncs, "\n")
 
@@ -167,7 +173,6 @@ func (gdi *GDIPool) GenGDIRegisterFile(override bool) {
 			ioutil.WriteFile(fn, []byte(source), 0755)
 		}
 	}
-	runCmd("gofmt","-w",fn)
-
+	runCmd("gofmt", "-w", fn)
 
 }

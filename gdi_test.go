@@ -1,6 +1,8 @@
 package gdi
 
 import (
+	"fmt"
+	"regexp"
 	"testing"
 )
 
@@ -163,4 +165,49 @@ func TestGetAllPackages(t *testing.T) {
 	if genDependency()=="" {
 		t.Fail()
 	}
+
+
+	src:=`
+func GenGDIRegisterFile(override bool) {
+	globalGDI.GenGDIRegisterFile(override)
+}
+
+func getCurrentAbPathByCaller(skip int) string {
+	var abPath string
+	_, filename, _, ok := runtime.Caller(skip)
+	if ok {
+		abPath = path.Dir(filename)
+	}
+	return abPath
+}
+
+func (gdi *GDIPool) GenGDIRegisterFile(override bool) {
+	fn := getCurrentAbPathByCaller(3) + "/gdi_gen.go"
+	source := genDependency()
+	if _, err := os.Stat(fn); err != nil {
+		ioutil.WriteFile(fn, []byte(source), 0755)
+	} else {
+		if override {
+			ioutil.WriteFile(fn, []byte(source), 0755)
+		}
+	}
+	runCmd("gofmt","-w",fn)
+
+
+}
+`
+	i:=0;
+	for {
+		old:=len(src)
+
+		reg := regexp.MustCompile(`{[^{|}]+}`)
+
+		src = reg.ReplaceAllString(src, "")
+		if len(src)==old {
+			break
+		}
+		i++
+	}
+
+	fmt.Println(src,i)
 }
