@@ -40,9 +40,7 @@ func getDir() string {
 }
 
 func getGoSources() map[string][]string {
-	entry:=getCurrentAbPathByCaller()
-	entry=path.Dir(entry)
-	packagePath := strings.TrimSpace(runCmd("cd",entry,"|","go", "list", "-f", "{{.ImportPath}}"))
+	packagePath := strings.TrimSpace(runCmd( "go", "list", "-f", "{{.Module}}"))
 	packages := getAllPackages()
 	reg := regexp.MustCompile(`package\s+main\s*$`)
 	comment := regexp.MustCompile(`^\/\*.*?\*\/$|^\/\/.*?[\r\n]|\{.*?\}`)
@@ -137,9 +135,9 @@ func GenGDIRegisterFile(override bool) {
 	globalGDI.GenGDIRegisterFile(override)
 }
 
-func getCurrentAbPathByCaller() string {
+func getCurrentAbPathByCaller(skip int) string {
 	var abPath string
-	_, filename, _, ok := runtime.Caller(3)
+	_, filename, _, ok := runtime.Caller(skip)
 	if ok {
 		abPath = path.Dir(filename)
 	}
@@ -147,7 +145,7 @@ func getCurrentAbPathByCaller() string {
 }
 
 func (gdi *GDIPool) GenGDIRegisterFile(override bool) {
-	fn := getCurrentAbPathByCaller() + "/gdi_gen.go"
+	fn := getCurrentAbPathByCaller(3) + "/gdi_gen.go"
 	source := genDependency()
 	if _, err := os.Stat(fn); err != nil {
 		ioutil.WriteFile(fn, []byte(source), 0755)
