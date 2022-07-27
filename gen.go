@@ -29,7 +29,6 @@ func getAllPackages() []string {
 
 	packages := runCmd("go", "list", "./...")
 
-
 	return strings.Split(packages, "\n")
 }
 
@@ -40,12 +39,12 @@ func getDir() string {
 }
 
 func getGoSources() map[string][]string {
-	packagePath := runCmd("go","list","-f","{{.Module}}","./...")
-	packagePath=strings.TrimSpace(strings.Split(packagePath,"\n")[0])
-	packages:=getAllPackages()
+	packagePath := runCmd("go", "list", "-f", "{{.Module}}", "./...")
+	packagePath = strings.TrimSpace(strings.Split(packagePath, "\n")[0])
+	packages := getAllPackages()
 	reg := regexp.MustCompile(`package\s+main\s*$`)
 	comment := regexp.MustCompile(`/\*{1,2}[\s\S]*?\*/|//[\s\S]*?\n`) //remove comment
-	regBrackets := regexp.MustCompile("`[^`]+?`|{[^{|}]*}")                    //remove {}
+	regBrackets := regexp.MustCompile("`[^`]+?`|{[^{|}]*}")           //remove {}
 	goFiles := make(map[string][]string)
 	baseDir := strings.TrimSpace(getDir())
 	for _, p := range packages {
@@ -163,12 +162,11 @@ func getCurrentAbPathByCaller(skip int) string {
 
 func (gdi *GDIPool) GenGDIRegisterFile(override bool) {
 	fn := getCurrentAbPathByCaller(3) + "/gdi_gen.go"
-	source := genDependency()
 	if _, err := os.Stat(fn); err != nil {
-		ioutil.WriteFile(fn, []byte(source), 0755)
+		ioutil.WriteFile(fn, []byte(genDependency()), 0755)
 	} else {
 		if override {
-			ioutil.WriteFile(fn, []byte(source), 0755)
+			ioutil.WriteFile(fn, []byte(genDependency()), 0755)
 		}
 	}
 	runCmd("gofmt", "-w", fn)
