@@ -70,7 +70,8 @@ func getGoSources() map[string][]string {
 				source := string(bs)
 				lines := strings.Split(source, "\n")
 				if reg.MatchString(lines[0]) {
-					continue
+					//continue
+					p = "."
 				}
 				source = comment.ReplaceAllString(source, "")
 				for i := 0; i < 100; i++ {
@@ -117,11 +118,15 @@ func genDependency() string {
 			for _, m := range matches {
 				if len(m) == 2 {
 					bflag = true
-					regFuncs = append(regFuncs, fmt.Sprintf("gdi.PlaceHolder((*p%v.%v)(nil))", index, m[1]))
+					if p == "." {
+						regFuncs = append(regFuncs, fmt.Sprintf("gdi.PlaceHolder((*%v)(nil))", m[1]))
+					} else {
+						regFuncs = append(regFuncs, fmt.Sprintf("gdi.PlaceHolder((*p%v.%v)(nil))", index, m[1]))
+					}
 				}
 			}
 		}
-		if bflag {
+		if bflag && p != "." {
 			aliasPack = append(aliasPack, fmt.Sprintf(`p%v "%v"`, index, p))
 		}
 	}
