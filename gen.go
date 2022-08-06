@@ -68,12 +68,14 @@ func getGoSources() map[string][]string {
 
 				}
 				source := string(bs)
+				source = comment.ReplaceAllString(source, "")
+				source= strings.TrimSpace(source)
 				lines := strings.Split(source, "\n")
 				if reg.MatchString(lines[0]) {
 					//continue
 					p = "."
 				}
-				source = comment.ReplaceAllString(source, "")
+
 				for i := 0; i < 100; i++ {
 					old := len(source)
 					source = regBrackets.ReplaceAllString(source, "")
