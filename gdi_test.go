@@ -3,6 +3,7 @@ package gdi
 import (
 	"fmt"
 	"regexp"
+	"sync"
 	"testing"
 )
 
@@ -148,7 +149,14 @@ func TestAll3(t *testing.T) {
 	Register(&c)
 	Init()
 
-	DIForTest(&s)
+	wg:=sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		DIForTest(&s)
+		wg.Done()
+	}()
+	go DIForTest(&s)
+	wg.Wait()
 
 	if s.Student.Name != c.Student.Name {
 		t.Fail()
