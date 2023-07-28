@@ -919,6 +919,10 @@ func (gdi *GDIPool) create(fun interface{}) []reflect.Value {
 }
 
 func (gdi *GDIPool) setReadOnly(outType reflect.Type, f interface{}) {
+	gdi.creatorLocker.Lock()
+	defer gdi.creatorLocker.Unlock()
+	gdi.ttvLocker.Lock()
+	defer gdi.ttvLocker.Unlock()
 	if f != nil {
 		if reflect.TypeOf(f).Kind() == reflect.Func {
 			vals := gdi.create(f)
@@ -951,17 +955,19 @@ func (gdi *GDIPool) setReadOnly(outType reflect.Type, f interface{}) {
 			gdi.panic(fmt.Sprintf("double register %v", outType))
 			return
 		}
-		gdi.creatorLocker.Lock()
-		defer gdi.creatorLocker.Unlock()
+
 		if reflect.TypeOf(f).Kind() == reflect.Func && f != nil {
 			gdi.creator[outType] = f
 		}
-		gdi.ttvLocker.Lock()
-		defer gdi.ttvLocker.Unlock()
+
 	}
 }
 
 func (gdi *GDIPool) set(outType reflect.Type, f interface{}) {
+	gdi.creatorLocker.Lock()
+	defer gdi.creatorLocker.Unlock()
+	gdi.ttvLocker.Lock()
+	defer gdi.ttvLocker.Unlock()
 	if f != nil {
 		if reflect.TypeOf(f).Kind() == reflect.Func {
 			vals := gdi.create(f)
@@ -994,13 +1000,11 @@ func (gdi *GDIPool) set(outType reflect.Type, f interface{}) {
 			gdi.panic(fmt.Sprintf("double register %v", outType))
 			return
 		}
-		gdi.creatorLocker.Lock()
-		defer gdi.creatorLocker.Unlock()
+
 		if reflect.TypeOf(f).Kind() == reflect.Func && f != nil {
 			gdi.creator[outType] = f
 		}
-		gdi.ttvLocker.Lock()
-		defer gdi.ttvLocker.Unlock()
+
 	}
 }
 
