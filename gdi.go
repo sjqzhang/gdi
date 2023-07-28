@@ -154,6 +154,21 @@ func GetAllTypes() []reflect.Type {
 	return globalGDI.GetAllTypes()
 }
 
+// ConvertToSnakeCase 将驼峰命名转换为蛇形命名
+func ConvertToSnakeCase(input string) string {
+	return globalGDI.ConvertToSnakeCase(input)
+}
+
+// 将蛇形命名转换为驼峰命名
+func ConvertToCamelCase(input string) string {
+	return globalGDI.ConvertToCamelCase(input)
+}
+
+//AutoRegisterByPackName 根据正则获取所有类型并自动注册
+func AutoRegisterByPackName(packageRegexp string) ([]reflect.Value, error) {
+	return globalGDI.AutoRegisterByPackName(packageRegexp)
+}
+
 //GetAllTypesByPackName 根据正则获取所有类型
 func GetAllTypesByPackName(packageRegexp string) ([]reflect.Type, error) {
 	return globalGDI.GetAllTypesByPackName(packageRegexp)
@@ -179,6 +194,27 @@ func (gdi *GDIPool) ScanPkgPaths(scanPaths ...string) {
 
 func (gdi *GDIPool) IgnorePrivate(isIgnorePrivate bool) {
 	gdi.ignorePrivate = isIgnorePrivate
+}
+
+// ConvertToSnakeCase 将驼峰命名转换为蛇形命名
+func (gdi *GDIPool) ConvertToSnakeCase(input string) string {
+	// 使用正则表达式匹配大写字母，并在它们前面加上下划线
+	re := regexp.MustCompile("([a-z0-9])([A-Z])")
+	snakeCase := re.ReplaceAllString(input, "${1}_${2}")
+	// 将所有字符转换为小写
+	snakeCase = strings.ToLower(snakeCase)
+	return snakeCase
+}
+
+// 将蛇形命名转换为驼峰命名
+func (gdi *GDIPool) ConvertToCamelCase(input string) string {
+	// 使用正则表达式匹配下划线
+	re := regexp.MustCompile("_(\\w)|^\\w")
+	camelCase := re.ReplaceAllStringFunc(input, func(s string) string {
+		// 将匹配到的下划线替换为对应字符的大写形式
+		return strings.ToUpper(strings.Replace(s, "_", "", -1))
+	})
+	return camelCase
 }
 
 //Register 用于注册自己的业务代码
@@ -589,6 +625,27 @@ func (gdi *GDIPool) GetAllTypesByPackName(packageRegexp string) ([]reflect.Type,
 	}
 	return ts, nil
 
+}
+
+//AutoRegisterByPackName 获取所有类型
+func (gdi *GDIPool) AutoRegisterByPackName(packageRegexp string) ([]reflect.Value, error) {
+	objs, err := gdi.GetAllTypesByPackName(packageRegexp)
+	if err != nil {
+		return nil, err
+	}
+	var objValues []reflect.Value
+	for _, c := range objs {
+		if c.Elem().Kind() == reflect.Interface {
+			continue
+		}
+		I := reflect.New(c.Elem())
+		if reflect.TypeOf(I).Kind() == reflect.Interface {
+			continue
+		}
+		gdi.Register(I.Interface())
+		objValues = append(objValues, I)
+	}
+	return objValues, nil
 }
 
 // DIForTest 自动依懒注入

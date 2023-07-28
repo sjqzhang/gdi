@@ -149,7 +149,7 @@ func TestAll3(t *testing.T) {
 	Register(&c)
 	Init()
 
-	wg:=sync.WaitGroup{}
+	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		DIForTest(&s)
@@ -166,16 +166,14 @@ func TestAll3(t *testing.T) {
 
 func TestGetAllPackages(t *testing.T) {
 
-
 	//getAllPackages()
 	//genDependency()
 
-	if genDependency()=="" {
+	if genDependency() == "" {
 		t.Fail()
 	}
 
-
-	src:=`
+	src := `
 func GenGDIRegisterFile(override bool) {
 	globalGDI.GenGDIRegisterFile(override)
 }
@@ -262,18 +260,66 @@ func CrudTemplate() string {
 
 
 `
-	i:=0;
+	i := 0
 	for {
-		old:=len(src)
+		old := len(src)
 
 		reg := regexp.MustCompile("{[^{|}]*}|`[^`]+?`")
 
 		src = reg.ReplaceAllString(src, "")
-		if len(src)==old {
+		if len(src) == old {
 			break
 		}
 		i++
 	}
 
-	fmt.Println(src,i)
+	fmt.Println(src, i)
+}
+
+//type UserController struct {
+//}
+//
+//func (u *UserController) Get(c *gin.Context) {
+//	c.JSON(200, gin.H{
+//		"message": "pong",
+//	})
+//}
+//
+//func TestGin(t *testing.T) {
+//	s:=UserController{}
+//	fmt.Sprintf("%s",s)
+//	objs,err:= AutoRegisterByPackName("gdi.*Controller")
+//	if err!=nil {
+//		t.Fail()
+//	}
+//	//通过反射绑定路由
+//	r:=gin.Default()
+//	for _,o:=range objs {
+//		if o.NumMethod()==0 {
+//			continue
+//		}
+//		if !o.Type().Method(0).IsExported() {
+//			continue
+//		}
+//		name:=o.Type().Method(0).Name
+//
+//		x:=o.Method(0).Interface()
+//
+//		switch x.(type) {
+//		case func(*gin.Context):
+//			r.Handle("GET","/"+name,x.(func(*gin.Context)))
+//
+//		}
+//		fmt.Println(o,x)
+//
+//	}
+//	r.Run() // listen and serve on
+//
+//}
+
+func TestXxx(t *testing.T) {
+	name := "HelloWorld"
+	if ConvertToCamelCase(ConvertToSnakeCase(name)) != name {
+		t.Fail()
+	}
 }
