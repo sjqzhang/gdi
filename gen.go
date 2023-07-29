@@ -10,8 +10,16 @@ import (
 	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 )
+
+var sources map[string][]string = make(map[string][]string)
+var packSources map[string][]string = make(map[string][]string)
+
+func init() {
+	sources = getGoSources()
+}
 
 func runCmd(cmds ...string) string {
 	if len(cmds) < 1 {
@@ -42,13 +50,11 @@ func getGoSources() map[string][]string {
 	packagePath := runCmd("go", "list", "-f", "{{.Module}}", "./...")
 	packagePath = strings.TrimSpace(strings.Split(packagePath, "\n")[0])
 	packages := getAllPackages()
-	reg := regexp.MustCompile(`package\s+main\s*$`)
-	comment := regexp.MustCompile(`/\*{1,2}[\s\S]*?\*/|//[\s\S]*?\n`) //remove comment
-	regBrackets := regexp.MustCompile("`[^`]+?`|{[^{|}]*}")           //remove {}
+
 	goFiles := make(map[string][]string)
 	baseDir := strings.TrimSpace(getDir())
 	if !strings.HasPrefix(baseDir, "/") {
-		baseDir,_=os.Getwd()
+		baseDir, _ = os.Getwd()
 	}
 	for _, p := range packages {
 		dir := strings.TrimPrefix(p, packagePath)
@@ -61,7 +67,8 @@ func getGoSources() map[string][]string {
 		if err != nil {
 			fmt.Println(err)
 		}
-		var gos []string
+		//var gos []string
+		var orginGors []string
 		for _, f := range fs {
 			if strings.HasSuffix(f.Name(), ".go") && !strings.HasSuffix(f.Name(), "_test.go") {
 				bs, err := ioutil.ReadFile(dirPrefix + "/" + f.Name())
@@ -71,24 +78,44 @@ func getGoSources() map[string][]string {
 
 				}
 				source := string(bs)
-				source = comment.ReplaceAllString(source, "")
-				source= strings.TrimSpace(source)
-				lines := strings.Split(source, "\n")
-				if reg.MatchString(lines[0]) {
-					continue //ignore main package
-					//p = "."
-				}
+				orginGors = append(orginGors, source)
 
-				for i := 0; i < 100; i++ {
-					old := len(source)
-					source = regBrackets.ReplaceAllString(source, "")
-					if len(source) == old {
-						break
-					}
-				}
-				gos = append(gos, source)
 			}
 
+		}
+		packSources[strings.Trim(dir, "/")] = orginGors
+		goFiles[p] = orginGors
+
+	}
+
+	return goFiles
+
+}
+
+func getImportSource() map[string][]string {
+	goFiles := make(map[string][]string)
+	reg := regexp.MustCompile(`package\s+main\s*$`)
+	comment := regexp.MustCompile(`/\*{1,2}[\s\S]*?\*/|//[\s\S]*?\n`) //remove comment
+	regBrackets := regexp.MustCompile("`[^`]+?`|{[^{|}]*}")           //remove {}
+	for p, files := range sources {
+		var gos []string
+		for _, source := range files {
+			source = comment.ReplaceAllString(source, "")
+			source = strings.TrimSpace(source)
+			lines := strings.Split(source, "\n")
+			if reg.MatchString(lines[0]) {
+				continue //ignore main package
+				//p = "."
+			}
+
+			for i := 0; i < 100; i++ {
+				old := len(source)
+				source = regBrackets.ReplaceAllString(source, "")
+				if len(source) == old {
+					break
+				}
+			}
+			gos = append(gos, source)
 		}
 		goFiles[p] = gos
 
@@ -98,8 +125,51 @@ func getGoSources() map[string][]string {
 
 }
 
+//如果是go1.16以上，使用go embed
+func checkGoVersion(version string) bool {
+	//判断go版本是否大于指定版本,大于指定版本返回true
+	curVersion := runtime.Version()
+	if len(curVersion) > len(version) {
+		curVersion = curVersion[0 : len(version)-1]
+	}
+	if compareVersion(curVersion, version) >= 0 {
+		return true
+	}
+	return false
+}
+
+// compareVersion 比较两个版本号的大小
+// 返回值：
+//   -1 表示 version1 < version2
+//    0 表示 version1 = version2
+//    1 表示 version1 > version2
+func compareVersion(version1, version2 string) int {
+	parts1 := strings.Split(version1, ".")
+	parts2 := strings.Split(version2, ".")
+
+	for i := 0; i < len(parts1) && i < len(parts2); i++ {
+		num1, _ := strconv.Atoi(parts1[i])
+		num2, _ := strconv.Atoi(parts2[i])
+
+		if num1 < num2 {
+			return -1
+		} else if num1 > num2 {
+			return 1
+		}
+	}
+
+	// 版本号长度不一致时，较长部分为大
+	if len(parts1) < len(parts2) {
+		return -1
+	} else if len(parts1) > len(parts2) {
+		return 1
+	}
+
+	return 0
+}
+
 func genDependency() string {
-	packages := getGoSources()
+	packages := getImportSource()
 	reg := regexp.MustCompile(`type\s+([A-Z]\w+)\s+struct`)
 
 	var aliasPack []string
@@ -150,9 +220,41 @@ func init() {
 
 `
 
+	bflag := false
+
+	if checkGoVersion("go1.16") {
+		tpl = `package main
+
+import (
+	%v
+	"github.com/sjqzhang/gdi"
+	"embed"
+)
+
+//go:embed %v
+var gdiEmbededFiles embed.FS
+
+func init() {
+     _=gdi.GDIPool{}
+	%v
+}
+
+`
+		bflag = true
+
+	}
+
 	importPackages := strings.Join(aliasPack, "\n")
 	registerFun := strings.Join(regFuncs, "\n")
 
+	var ps []string
+	for p, _ := range packSources {
+		ps = append(ps, p)
+	}
+	pss := strings.Join(ps, " ")
+	if bflag {
+		return fmt.Sprintf(tpl, importPackages, pss, registerFun)
+	}
 	return fmt.Sprintf(tpl, importPackages, registerFun)
 
 }
@@ -181,4 +283,105 @@ func (gdi *GDIPool) GenGDIRegisterFile(override bool) {
 	}
 	runCmd("gofmt", "-w", fn)
 
+}
+
+func GetRouterInfo(packageName string) (map[string]RouterInfo, error) {
+	return globalGDI.GetRouterInfo(packageName)
+}
+
+type RouterInfo struct {
+	Uri        string `json:"uri"`
+	Method     string `json:"method"`
+	Controller string `json:"controller"`
+	Handler    string `json:"handler"`
+}
+
+func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
+	var routerInfos []RouterInfo
+	regex:=regexp.MustCompile(`func\s*\(([^)]+)\)\s+([\w]+)`)
+	matches:=regex.FindAllStringSubmatch(sourceCode,-1)
+	spaceReg := regexp.MustCompile(`\s+\*?`)
+	//Http Method Match Regex
+	methodReg := regexp.MustCompile(`(Get|Post|Put|Delete|Head|Options|Patch|Any)`)
+	for _, match := range matches {
+		if len(match) != 3 {
+			continue
+		}
+		ctrlName := ""
+		controller := spaceReg.Split(match[1], -1)
+		if len(controller) > 1 {
+			ctrlName = controller[1]
+		}
+		if !strings.HasSuffix(ctrlName,"Controller"){
+			continue
+		}
+		uri:="/api/"+ strings.ToLower(ctrlName[:len(ctrlName)-10])+"/"+strings.TrimSpace(match[2])
+		//从方法名中获取HTTP方法,方法名格式为Get,Post,Put,Delete
+		methodMatch := methodReg.FindStringSubmatch(match[2])
+		method:="GET"
+		if len(methodMatch) > 1 {
+			method = strings.ToUpper(methodMatch[1])
+		}
+		routerInfo := RouterInfo{
+			Uri:        uri,
+			Method:     method,
+			Controller: strings.TrimSpace(ctrlName),
+			Handler:    strings.TrimSpace(match[2]),
+		}
+		routerInfos = append(routerInfos, routerInfo)
+	}
+
+	// 定义正则表达式，匹配格式为 // @router /uri [method]\nfunc (this *Controller) HandlerName()
+	regex = regexp.MustCompile(`//\s*@router\s+(\/\S+)\s+\[(\S+)\]\s*\nfunc\s*\(([^\)]+)\)\s*([\w]+)`)
+	matches = regex.FindAllStringSubmatch(sourceCode, -1)
+
+
+	for _, match := range matches {
+		if len(match) != 5 {
+			continue
+		}
+		ctrlName := ""
+		controller := spaceReg.Split(match[3], -1)
+		if len(controller) > 1 {
+			ctrlName = controller[1]
+		}
+		routerInfo := RouterInfo{
+			Uri:       strings.TrimSpace( match[1]),
+			Method:     strings.ToUpper( strings.TrimSpace(match[2])),
+			Controller: strings.TrimSpace(ctrlName),
+			Handler:    strings.TrimSpace(match[4]),
+		}
+		routerInfos = append(routerInfos, routerInfo)
+	}
+
+	return routerInfos, nil
+}
+
+func genRouter(packageName string) ([]RouterInfo, error) {
+	var routerInfos []RouterInfo
+	for p, files := range packSources {
+		if p != packageName {
+			continue
+		}
+		for _, f := range files {
+			infos, err := parseRouterInfo(f)
+			if err != nil {
+				return infos, err
+			}
+			routerInfos = append(routerInfos, infos...)
+		}
+	}
+	return routerInfos, nil
+}
+
+func (gdi *GDIPool) GetRouterInfo(packageName string) (map[string]RouterInfo, error) {
+	routerInfos, err := genRouter(packageName)
+	if err != nil {
+		return nil, err
+	}
+	routerInfoMap := make(map[string]RouterInfo)
+	for _, routerInfo := range routerInfos {
+		routerInfoMap[routerInfo.Controller+"."+routerInfo.Handler] = routerInfo
+	}
+	return routerInfoMap, nil
 }

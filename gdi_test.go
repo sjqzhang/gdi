@@ -288,7 +288,7 @@ func CrudTemplate() string {
 //func TestGin(t *testing.T) {
 //	s:=UserController{}
 //	fmt.Sprintf("%s",s)
-//	objs,err:= AutoRegisterByPackName("gdi.*Controller")
+//	objs,err:= AutoRegisterByPackNamePatten("gdi.*Controller")
 //	if err!=nil {
 //		t.Fail()
 //	}
