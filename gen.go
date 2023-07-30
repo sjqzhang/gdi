@@ -408,14 +408,20 @@ func parseRouterComment(comment string) *RouterInfo {
 			Uri:    parts[1],
 			Method: strings.ToUpper(strings.Trim(parts[2], "[ ]")),
 		}
+	} else if len(parts)==2 {
+		return &RouterInfo{
+			Uri:    parts[1],
+			Method: "ANY",
+		}
 	}
 	return nil
 }
 
 func parseMiddlewareComment(comment string) []string {
-	parts := strings.Split(strings.TrimSpace(comment), " ")
-	if len(parts) > 1 {
-		return parts[1:]
+	reg:=regexp.MustCompile(`\s*@middleware\s+([^\n]+)`)
+	parts:=reg.FindAllStringSubmatch(comment,-1)
+	if len(parts) > 0 && len(parts[0])>0 {
+	   return strings.Split( strings.Replace(parts[0][1]," ","",-1),",")
 	}
 	return nil
 }
@@ -523,7 +529,6 @@ func (gdi *GDIPool) genRouter(packageName string) ([]RouterInfo, error) {
 	for _, file := range files {
 		byteContents, err := gdi.fs.ReadFile(fmt.Sprintf("%v/%v", packageName, file.Name()))
 		if err != nil {
-			gdi.log(err.Error())
 			continue
 		}
 		infos, err := parseRouterInfo(string(byteContents))
@@ -538,6 +543,7 @@ func (gdi *GDIPool) genRouter(packageName string) ([]RouterInfo, error) {
 func (gdi *GDIPool) GetRouterInfo(packageName string) (map[string]RouterInfo, error) {
 	routerInfos, err := gdi.genRouter(packageName)
 	if err != nil {
+		gdi.log(err.Error())
 		return nil, err
 	}
 	routerInfoMap := make(map[string]RouterInfo)
