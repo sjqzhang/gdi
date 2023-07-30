@@ -167,13 +167,13 @@ func ConvertToCamelCase(input string) string {
 }
 
 //AutoRegisterByPackName 根据正则获取所有类型并自动注册
-func AutoRegisterByPackNamePatten(packageRegexp string) ([]reflect.Value, error) {
-	return globalGDI.AutoRegisterByPackNamePatten(packageRegexp)
+func AutoRegisterByPackagePatten(packageRegexp string) ([]reflect.Value, error) {
+	return globalGDI.AutoRegisterByPackagePatten(packageRegexp)
 }
 
 //GetAllTypesByPackName 根据正则获取所有类型
 func GetAllTypesByPackName(packageRegexp string) ([]reflect.Type, error) {
-	return globalGDI.GetAllTypesByPackNamePatten(packageRegexp)
+	return globalGDI.GetAllTypesByPackagePatten(packageRegexp)
 }
 
 //GetWithCheck 从容器中获取值
@@ -613,7 +613,7 @@ func (gdi *GDIPool) GetAllTypes() []reflect.Type {
 }
 
 //GetAllTypes 获取所有类型
-func (gdi *GDIPool) GetAllTypesByPackNamePatten(packageRegexp string) ([]reflect.Type, error) {
+func (gdi *GDIPool) GetAllTypesByPackagePatten(packageRegexp string) ([]reflect.Type, error) {
 	var ts []reflect.Type
 	reg, err := regexp.Compile(packageRegexp)
 	if err != nil {
@@ -630,8 +630,8 @@ func (gdi *GDIPool) GetAllTypesByPackNamePatten(packageRegexp string) ([]reflect
 }
 
 //AutoRegisterByPackName 获取所有类型
-func (gdi *GDIPool) AutoRegisterByPackNamePatten(packagePatten string) ([]reflect.Value, error) {
-	objs, err := gdi.GetAllTypesByPackNamePatten(packagePatten)
+func (gdi *GDIPool) AutoRegisterByPackagePatten(packagePatten string) ([]reflect.Value, error) {
+	objs, err := gdi.GetAllTypesByPackagePatten(packagePatten)
 	if err != nil {
 		return nil, err
 	}
