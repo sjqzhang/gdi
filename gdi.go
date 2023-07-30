@@ -1,6 +1,7 @@
 package gdi
 
 import (
+	"embed"
 	"errors"
 	"fmt"
 	"github.com/sjqzhang/gdi/tl"
@@ -44,6 +45,7 @@ type GDIPool struct {
 	interfaceToImplements map[string]string
 	placeHolders          map[string]interface{}
 	g                     *graph
+	fs                    *embed.FS
 
 	ttvLocker  sync.RWMutex
 	autoCreate bool
