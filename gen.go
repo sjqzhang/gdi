@@ -332,23 +332,24 @@ func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 
 	var routerInfos []RouterInfo
 	var currentRouterInfo RouterInfo
-	var restInfo restInfo
+	var rest restInfo
 
 	for _, decl := range f.Decls {
 		switch d := decl.(type) {
 
 		case *ast.GenDecl:
+			rest=restInfo{}
 			if d.Doc != nil {
 				for _, comment := range d.Doc.List {
 					text := strings.TrimSpace(strings.TrimPrefix(comment.Text, "//"))
 					if strings.HasPrefix(text, "@router") {
 						routerInfo := parseRouterComment(text)
 						if routerInfo != nil {
-							restInfo.Uri = routerInfo.Uri
+							rest.Uri = routerInfo.Uri
 						}
 					} else if strings.HasPrefix(text, "@middleware") {
 						middlewares := parseMiddlewareComment(text)
-						restInfo.Middlewares = middlewares
+						rest.Middlewares = middlewares
 					}
 				}
 			}
@@ -356,20 +357,25 @@ func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 			for _, spec := range d.Specs {
 				if ts, ok := spec.(*ast.TypeSpec); ok {
 					if structType, ok := ts.Type.(*ast.StructType); ok {
-						restInfo.Controller = ts.Name.Name
+						rest.Controller = ts.Name.Name
 						_ = structType
 					}
 				}
 			}
 
 		case *ast.FuncDecl:
+			currentRouterInfo=RouterInfo{}
 			if d.Doc != nil {
 				for _, comment := range d.Doc.List {
 					text := strings.TrimSpace(strings.TrimPrefix(comment.Text, "//"))
 					if strings.HasPrefix(text, "@router") {
 						routerInfo := parseRouterComment(text)
 						if routerInfo != nil {
-							currentRouterInfo = *routerInfo
+							tmp:=*routerInfo
+							if tmp.Uri!="" {
+								currentRouterInfo.Uri=tmp.Uri
+								currentRouterInfo.Method=tmp.Method
+							}
 						}
 					} else if strings.HasPrefix(text, "@middleware") {
 						middlewares := parseMiddlewareComment(text)
@@ -384,13 +390,13 @@ func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 				currentRouterInfo.Controller = extractControllerName(d, sourceCode)
 			}
 
-			if currentRouterInfo.Uri != "" && currentRouterInfo.Method != "" && currentRouterInfo.Controller == restInfo.Controller {
+			if currentRouterInfo.Uri != "" && currentRouterInfo.Method != "" && currentRouterInfo.Controller != "" {
 				//currentRouterInfo.RestInfo = &restInfo
-				if restInfo.Uri!="" {
-					currentRouterInfo.Uri= restInfo.Uri+currentRouterInfo.Uri
+				if rest.Uri != "" {
+					currentRouterInfo.Uri = rest.Uri + currentRouterInfo.Uri
 				}
-				if currentRouterInfo.Middlewares == nil || len(currentRouterInfo.Middlewares) == 0 {
-					currentRouterInfo.Middlewares = restInfo.Middlewares
+				if currentRouterInfo.Middlewares == nil || len(currentRouterInfo.Middlewares) == 0 && currentRouterInfo.Controller== rest.Controller {
+					currentRouterInfo.Middlewares = rest.Middlewares
 				}
 				routerInfos = append(routerInfos, currentRouterInfo)
 			}
@@ -408,7 +414,7 @@ func parseRouterComment(comment string) *RouterInfo {
 			Uri:    parts[1],
 			Method: strings.ToUpper(strings.Trim(parts[2], "[ ]")),
 		}
-	} else if len(parts)==2 {
+	} else if len(parts) == 2 {
 		return &RouterInfo{
 			Uri:    parts[1],
 			Method: "ANY",
@@ -418,10 +424,10 @@ func parseRouterComment(comment string) *RouterInfo {
 }
 
 func parseMiddlewareComment(comment string) []string {
-	reg:=regexp.MustCompile(`\s*@middleware\s+([^\n]+)`)
-	parts:=reg.FindAllStringSubmatch(comment,-1)
-	if len(parts) > 0 && len(parts[0])>0 {
-	   return strings.Split( strings.Replace(parts[0][1]," ","",-1),",")
+	reg := regexp.MustCompile(`\s*@middleware\s+([^\n]+)`)
+	parts := reg.FindAllStringSubmatch(comment, -1)
+	if len(parts) > 0 && len(parts[0]) > 0 {
+		return strings.Split(strings.Replace(parts[0][1], " ", "", -1), ",")
 	}
 	return nil
 }
@@ -437,7 +443,7 @@ func extractControllerName(decl *ast.FuncDecl, sourceCode string) string {
 			n := sourceCode[recv.Pos():recv.End()]
 			ns := strings.Split(n, " ")
 			if len(ns) > 1 {
-				return strings.Trim(ns[1], ") ")
+				return strings.Trim(ns[1], "*) ")
 			}
 			recvName := field.Names[0].String()
 			if strings.Contains(recvName, "*") {
