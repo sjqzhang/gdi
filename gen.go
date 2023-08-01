@@ -20,6 +20,7 @@ import (
 
 var sources map[string][]string = make(map[string][]string)
 var packSources map[string][]string = make(map[string][]string)
+var restMap map[string]restInfo = make(map[string]restInfo)
 
 func init() {
 	sources = getGoSources()
@@ -338,7 +339,9 @@ func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 		switch d := decl.(type) {
 
 		case *ast.GenDecl:
-			rest=restInfo{}
+			rest = restInfo{
+
+			}
 			if d.Doc != nil {
 				for _, comment := range d.Doc.List {
 					text := strings.TrimSpace(strings.TrimPrefix(comment.Text, "//"))
@@ -358,23 +361,24 @@ func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 				if ts, ok := spec.(*ast.TypeSpec); ok {
 					if structType, ok := ts.Type.(*ast.StructType); ok {
 						rest.Controller = ts.Name.Name
+						restMap[rest.Controller] = rest
 						_ = structType
 					}
 				}
 			}
 
 		case *ast.FuncDecl:
-			currentRouterInfo=RouterInfo{}
+			currentRouterInfo = RouterInfo{}
 			if d.Doc != nil {
 				for _, comment := range d.Doc.List {
 					text := strings.TrimSpace(strings.TrimPrefix(comment.Text, "//"))
 					if strings.HasPrefix(text, "@router") {
 						routerInfo := parseRouterComment(text)
 						if routerInfo != nil {
-							tmp:=*routerInfo
-							if tmp.Uri!="" {
-								currentRouterInfo.Uri=tmp.Uri
-								currentRouterInfo.Method=tmp.Method
+							tmp := *routerInfo
+							if tmp.Uri != "" {
+								currentRouterInfo.Uri = tmp.Uri
+								currentRouterInfo.Method = tmp.Method
 							}
 						}
 					} else if strings.HasPrefix(text, "@middleware") {
@@ -390,16 +394,23 @@ func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 				currentRouterInfo.Controller = extractControllerName(d, sourceCode)
 			}
 
-			if currentRouterInfo.Uri != "" && currentRouterInfo.Method != "" && currentRouterInfo.Controller != "" {
-				//currentRouterInfo.RestInfo = &restInfo
-				if rest.Uri != "" {
-					currentRouterInfo.Uri = rest.Uri + currentRouterInfo.Uri
-				}
-				if currentRouterInfo.Middlewares == nil || len(currentRouterInfo.Middlewares) == 0 && currentRouterInfo.Controller== rest.Controller {
-					currentRouterInfo.Middlewares = rest.Middlewares
+			if currentRouterInfo.Handler != "" && currentRouterInfo.Controller != "" {
+				if currentRouterInfo.Method=="" {
+					currentRouterInfo.Method="ANY"
 				}
 				routerInfos = append(routerInfos, currentRouterInfo)
 			}
+
+			//if currentRouterInfo.Uri != "" && currentRouterInfo.Method != "" && currentRouterInfo.Controller != "" {
+			//	//currentRouterInfo.RestInfo = &restInfo
+			//	if rest.Uri != "" {
+			//		currentRouterInfo.Uri = rest.Uri + currentRouterInfo.Uri
+			//	}
+			//	if currentRouterInfo.Middlewares == nil || len(currentRouterInfo.Middlewares) == 0 && currentRouterInfo.Controller == rest.Controller {
+			//		currentRouterInfo.Middlewares = rest.Middlewares
+			//	}
+			//
+			//}
 
 		}
 	}
@@ -542,6 +553,20 @@ func (gdi *GDIPool) genRouter(packageName string) ([]RouterInfo, error) {
 			return infos, err
 		}
 		routerInfos = append(routerInfos, infos...)
+	}
+	// build router info
+	for k, rest := range restMap {
+		for i, route := range routerInfos {
+			if route.Controller == k {
+				if route.Uri=="" {
+					route.Uri=fmt.Sprintf("/%v",route.Handler)
+				}
+				routerInfos[i].Uri = rest.Uri + route.Uri
+				if len(route.Middlewares) == 0 {
+					routerInfos[i].Middlewares = rest.Middlewares
+				}
+			}
+		}
 	}
 	return routerInfos, nil
 }
