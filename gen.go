@@ -237,10 +237,10 @@ import (
 )
 
 //go:embed %v
-var gdiEmbededFiles embed.FS
+var gdiEmbedFiles embed.FS
 
 func init() {
-	gdi.SetEmbedFs(&gdiEmbededFiles)
+	gdi.SetEmbedFs(&gdiEmbedFiles)
      _=gdi.GDIPool{}
 	%v
 }
