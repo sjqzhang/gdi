@@ -1043,3 +1043,7 @@ func (gdi *GDIPool) PlaceHolder(objs ...interface{}) {
 		gdi.placeHolders[reflect.TypeOf(obj).String()] = obj
 	}
 }
+
+func (gdi *GDIPool) GetRestInfo(name string) (map[string]restInfo, error) {
+	return restMap,nil
+}

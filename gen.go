@@ -295,12 +295,16 @@ func GetRouterInfo(packageName string) (map[string]RouterInfo, error) {
 	return globalGDI.GetRouterInfo(packageName)
 }
 
+func GetRestInfo(packageName string) (map[string]restInfo, error) {
+	return globalGDI.GetRestInfo(packageName)
+}
 type RouterInfo struct {
 	Uri         string   `json:"uri"`
 	Method      string   `json:"method"`
 	Controller  string   `json:"controller"`
 	Handler     string   `json:"handler"`
 	Middlewares []string `json:"middlewares"`
+	Description string   `json:"description"`
 	//RestInfo    *restInfo
 }
 
@@ -308,6 +312,7 @@ type restInfo struct {
 	Uri         string   `json:"uri"`
 	Controller  string   `json:"controller"`
 	Middlewares []string `json:"middlewares"`
+	Description string   `json:"description"`
 }
 
 func parseMiddleware(sourceCode string) map[string][]string {
@@ -325,6 +330,15 @@ func parseMiddleware(sourceCode string) map[string][]string {
 }
 
 func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
+	//trim empty line
+	lines := strings.Split(sourceCode, "\n")
+	var newLines []string
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			newLines = append(newLines, line)
+		}
+	}
+	sourceCode = strings.Join(newLines, "\n")
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "", sourceCode, parser.ParseComments)
 	if err != nil {
@@ -339,11 +353,12 @@ func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 		switch d := decl.(type) {
 
 		case *ast.GenDecl:
-			rest = restInfo{
-
-			}
+			rest = restInfo{}
 			if d.Doc != nil {
 				for _, comment := range d.Doc.List {
+					if strings.TrimSpace(comment.Text) == "" {
+						continue
+					}
 					text := strings.TrimSpace(strings.TrimPrefix(comment.Text, "//"))
 					if strings.HasPrefix(text, "@router") {
 						routerInfo := parseRouterComment(text)
@@ -353,6 +368,8 @@ func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 					} else if strings.HasPrefix(text, "@middleware") {
 						middlewares := parseMiddlewareComment(text)
 						rest.Middlewares = middlewares
+					} else if strings.HasPrefix(text, "@description") {
+						rest.Description = strings.TrimSpace(strings.TrimPrefix(text, "@description"))
 					}
 				}
 			}
@@ -371,6 +388,9 @@ func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 			currentRouterInfo = RouterInfo{}
 			if d.Doc != nil {
 				for _, comment := range d.Doc.List {
+					if strings.TrimSpace(comment.Text) == "" {
+						continue
+					}
 					text := strings.TrimSpace(strings.TrimPrefix(comment.Text, "//"))
 					if strings.HasPrefix(text, "@router") {
 						routerInfo := parseRouterComment(text)
@@ -384,6 +404,8 @@ func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 					} else if strings.HasPrefix(text, "@middleware") {
 						middlewares := parseMiddlewareComment(text)
 						currentRouterInfo.Middlewares = middlewares
+					} else if strings.HasPrefix(text,"@description") {
+						currentRouterInfo.Description = strings.TrimSpace(strings.TrimPrefix(text, "@description"))
 					}
 				}
 			}
@@ -395,8 +417,8 @@ func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 			}
 
 			if currentRouterInfo.Handler != "" && currentRouterInfo.Controller != "" {
-				if currentRouterInfo.Method=="" {
-					currentRouterInfo.Method="ANY"
+				if currentRouterInfo.Method == "" {
+					currentRouterInfo.Method = "ANY"
 				}
 				routerInfos = append(routerInfos, currentRouterInfo)
 			}
@@ -558,8 +580,8 @@ func (gdi *GDIPool) genRouter(packageName string) ([]RouterInfo, error) {
 	for k, rest := range restMap {
 		for i, route := range routerInfos {
 			if route.Controller == k {
-				if route.Uri=="" {
-					route.Uri=fmt.Sprintf("/%v",route.Handler)
+				if route.Uri == "" {
+					route.Uri = fmt.Sprintf("/%v", route.Handler)
 				}
 				routerInfos[i].Uri = rest.Uri + route.Uri
 				if len(route.Middlewares) == 0 {
