@@ -298,21 +298,22 @@ func GetRouterInfo(packageName string) (map[string]RouterInfo, error) {
 func GetRestInfo(packageName string) (map[string]restInfo, error) {
 	return globalGDI.GetRestInfo(packageName)
 }
+
 type RouterInfo struct {
-	Uri         string   `json:"uri"`
-	Method      string   `json:"method"`
-	Controller  string   `json:"controller"`
-	Handler     string   `json:"handler"`
-	Middlewares []string `json:"middlewares"`
-	Description string   `json:"description"`
+	Uri         string                       `json:"uri"`
+	Method      string                       `json:"method"`
+	Controller  string                       `json:"controller"`
+	Handler     string                       `json:"handler"`
+	Middlewares map[string]map[string]string `json:"middlewares"`
+	Description string                       `json:"description"`
 	//RestInfo    *restInfo
 }
 
 type restInfo struct {
-	Uri         string   `json:"uri"`
-	Controller  string   `json:"controller"`
-	Middlewares []string `json:"middlewares"`
-	Description string   `json:"description"`
+	Uri         string                       `json:"uri"`
+	Controller  string                       `json:"controller"`
+	Middlewares map[string]map[string]string `json:"middlewares"`
+	Description string                       `json:"description"`
 }
 
 func parseMiddleware(sourceCode string) map[string][]string {
@@ -327,6 +328,39 @@ func parseMiddleware(sourceCode string) map[string][]string {
 		middlewares[strings.TrimSpace(match[2])] = regSplit.Split(match[1], -1)
 	}
 	return middlewares
+}
+func parseMiddlewareAnnotations(annotations string) map[string]map[string]string {
+	result := make(map[string]map[string]string)
+
+	// 分隔多个中间件
+	middlewareList := strings.Split(annotations, ";")
+
+	// 正则表达式用于匹配参数
+	paramRegexMatch := regexp.MustCompile(`(\([^\)]+\))`)
+
+	paramRegex := regexp.MustCompile(`(\w+)\s*=\s*("[^"]+?")|(\w+)\s*=\s*('[^']+?')|(\w+)\s*=\s*([^,]+)`)
+
+	for _, middleware := range middlewareList {
+		params := paramRegexMatch.FindString(middleware)
+		if params != "" {
+			middleware = middleware[:len(middleware)-len(params)]
+			params = params[1 : len(params)-1]
+		}
+		// 解析参数  ttl=5,prefix="news",key="{id},{title}" 成为map,注意value是字符串中带逗号的情况
+		paramMap := make(map[string]string)
+		if params != "" {
+			paramList := paramRegex.FindAllString(params, -1)
+			for _, param := range paramList {
+				kv := strings.Split(param, "=")
+				if len(kv) == 2 {
+					paramMap[kv[0]] = strings.TrimSpace(strings.Trim(kv[1], "\"'"))
+				}
+			}
+		}
+		result[middleware] = paramMap
+	}
+
+	return result
 }
 
 func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
@@ -366,7 +400,7 @@ func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 							rest.Uri = routerInfo.Uri
 						}
 					} else if strings.HasPrefix(text, "@middleware") {
-						middlewares := parseMiddlewareComment(text)
+						middlewares := parseMiddlewareAnnotations(text)
 						rest.Middlewares = middlewares
 					} else if strings.HasPrefix(text, "@description") {
 						rest.Description = strings.TrimSpace(strings.TrimPrefix(text, "@description"))
@@ -402,9 +436,9 @@ func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 							}
 						}
 					} else if strings.HasPrefix(text, "@middleware") {
-						middlewares := parseMiddlewareComment(text)
+						middlewares := parseMiddlewareAnnotations(text)
 						currentRouterInfo.Middlewares = middlewares
-					} else if strings.HasPrefix(text,"@description") {
+					} else if strings.HasPrefix(text, "@description") {
 						currentRouterInfo.Description = strings.TrimSpace(strings.TrimPrefix(text, "@description"))
 					}
 				}
@@ -488,71 +522,71 @@ func extractControllerName(decl *ast.FuncDecl, sourceCode string) string {
 	return ""
 }
 
-func parseRouterInfo2(sourceCode string) ([]RouterInfo, error) {
-	var routerInfos []RouterInfo
-	regex := regexp.MustCompile(`func\s*\(([^)]+)\)\s+([\w]+)`)
-	matches := regex.FindAllStringSubmatch(sourceCode, -1)
-	spaceReg := regexp.MustCompile(`\s+\*?`)
-	//Http Method Match Regex
-	methodReg := regexp.MustCompile(`(Get|Post|Put|Delete|Head|Options|Patch|Any)`)
-	for _, match := range matches {
-		if len(match) != 3 {
-			continue
-		}
-		ctrlName := ""
-		controller := spaceReg.Split(match[1], -1)
-		if len(controller) > 1 {
-			ctrlName = controller[1]
-		}
-		if !strings.HasSuffix(ctrlName, "Controller") {
-			continue
-		}
-		uri := "/api/" + strings.ToLower(ctrlName[:len(ctrlName)-10]) + "/" + strings.TrimSpace(match[2])
-		//从方法名中获取HTTP方法,方法名格式为Get,Post,Put,Delete
-		methodMatch := methodReg.FindStringSubmatch(match[2])
-		method := "GET"
-		if len(methodMatch) > 1 {
-			method = strings.ToUpper(methodMatch[1])
-		}
-		routerInfo := RouterInfo{
-			Uri:        uri,
-			Method:     method,
-			Controller: strings.TrimSpace(ctrlName),
-			Handler:    strings.TrimSpace(match[2]),
-		}
-		routerInfos = append(routerInfos, routerInfo)
-	}
-
-	// 定义正则表达式，匹配格式为 // @router /uri [method]\nfunc (this *Controller) HandlerName()
-	regex = regexp.MustCompile(`//\s*@router\s+(\/\S+)\s+\[(\S+)\]\s*\nfunc\s*\(([^\)]+)\)\s*([\w]+)`)
-	matches = regex.FindAllStringSubmatch(sourceCode, -1)
-
-	for _, match := range matches {
-		if len(match) != 5 {
-			continue
-		}
-		ctrlName := ""
-		controller := spaceReg.Split(match[3], -1)
-		if len(controller) > 1 {
-			ctrlName = controller[1]
-		}
-		routerInfo := RouterInfo{
-			Uri:        strings.TrimSpace(match[1]),
-			Method:     strings.ToUpper(strings.TrimSpace(match[2])),
-			Controller: strings.TrimSpace(ctrlName),
-			Handler:    strings.TrimSpace(match[4]),
-		}
-		routerInfos = append(routerInfos, routerInfo)
-	}
-
-	middleMap := parseMiddleware(sourceCode)
-	for i, info := range routerInfos {
-		if v, ok := middleMap[info.Controller]; ok {
-			routerInfos[i].Middlewares = v
-		}
-	}
-	return routerInfos, nil
-}
+//func parseRouterInfo2(sourceCode string) ([]RouterInfo, error) {
+//	var routerInfos []RouterInfo
+//	regex := regexp.MustCompile(`func\s*\(([^)]+)\)\s+([\w]+)`)
+//	matches := regex.FindAllStringSubmatch(sourceCode, -1)
+//	spaceReg := regexp.MustCompile(`\s+\*?`)
+//	//Http Method Match Regex
+//	methodReg := regexp.MustCompile(`(Get|Post|Put|Delete|Head|Options|Patch|Any)`)
+//	for _, match := range matches {
+//		if len(match) != 3 {
+//			continue
+//		}
+//		ctrlName := ""
+//		controller := spaceReg.Split(match[1], -1)
+//		if len(controller) > 1 {
+//			ctrlName = controller[1]
+//		}
+//		if !strings.HasSuffix(ctrlName, "Controller") {
+//			continue
+//		}
+//		uri := "/api/" + strings.ToLower(ctrlName[:len(ctrlName)-10]) + "/" + strings.TrimSpace(match[2])
+//		//从方法名中获取HTTP方法,方法名格式为Get,Post,Put,Delete
+//		methodMatch := methodReg.FindStringSubmatch(match[2])
+//		method := "GET"
+//		if len(methodMatch) > 1 {
+//			method = strings.ToUpper(methodMatch[1])
+//		}
+//		routerInfo := RouterInfo{
+//			Uri:        uri,
+//			Method:     method,
+//			Controller: strings.TrimSpace(ctrlName),
+//			Handler:    strings.TrimSpace(match[2]),
+//		}
+//		routerInfos = append(routerInfos, routerInfo)
+//	}
+//
+//	// 定义正则表达式，匹配格式为 // @router /uri [method]\nfunc (this *Controller) HandlerName()
+//	regex = regexp.MustCompile(`//\s*@router\s+(\/\S+)\s+\[(\S+)\]\s*\nfunc\s*\(([^\)]+)\)\s*([\w]+)`)
+//	matches = regex.FindAllStringSubmatch(sourceCode, -1)
+//
+//	for _, match := range matches {
+//		if len(match) != 5 {
+//			continue
+//		}
+//		ctrlName := ""
+//		controller := spaceReg.Split(match[3], -1)
+//		if len(controller) > 1 {
+//			ctrlName = controller[1]
+//		}
+//		routerInfo := RouterInfo{
+//			Uri:        strings.TrimSpace(match[1]),
+//			Method:     strings.ToUpper(strings.TrimSpace(match[2])),
+//			Controller: strings.TrimSpace(ctrlName),
+//			Handler:    strings.TrimSpace(match[4]),
+//		}
+//		routerInfos = append(routerInfos, routerInfo)
+//	}
+//
+//	middleMap := parseMiddleware(sourceCode)
+//	for i, info := range routerInfos {
+//		if v, ok := middleMap[info.Controller]; ok {
+//			routerInfos[i].Middlewares = v
+//		}
+//	}
+//	return routerInfos, nil
+//}
 
 func (gdi *GDIPool) genRouter(packageName string) ([]RouterInfo, error) {
 	var routerInfos []RouterInfo
