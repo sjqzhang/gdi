@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 var sources map[string][]string = make(map[string][]string)
@@ -299,21 +300,26 @@ func GetRestInfo(packageName string) (map[string]restInfo, error) {
 	return globalGDI.GetRestInfo(packageName)
 }
 
+type middleware struct {
+	Name   string
+	Params sync.Map
+}
+
 type RouterInfo struct {
-	Uri         string                       `json:"uri"`
-	Method      string                       `json:"method"`
-	Controller  string                       `json:"controller"`
-	Handler     string                       `json:"handler"`
-	Middlewares map[string]map[string]string `json:"middlewares"`
-	Description string                       `json:"description"`
+	Uri         string       `json:"uri"`
+	Method      string       `json:"method"`
+	Controller  string       `json:"controller"`
+	Handler     string       `json:"handler"`
+	Middlewares []middleware `json:"middlewares"`
+	Description string       `json:"description"`
 	//RestInfo    *restInfo
 }
 
 type restInfo struct {
-	Uri         string                       `json:"uri"`
-	Controller  string                       `json:"controller"`
-	Middlewares map[string]map[string]string `json:"middlewares"`
-	Description string                       `json:"description"`
+	Uri         string       `json:"uri"`
+	Controller  string       `json:"controller"`
+	Middlewares []middleware `json:"middlewares"`
+	Description string       `json:"description"`
 }
 
 func parseMiddleware(sourceCode string) map[string][]string {
@@ -329,8 +335,9 @@ func parseMiddleware(sourceCode string) map[string][]string {
 	}
 	return middlewares
 }
-func parseMiddlewareAnnotations(annotations string) map[string]map[string]string {
-	result := make(map[string]map[string]string)
+func parseMiddlewareAnnotations(annotations string) []middleware {
+
+	var middlewares []middleware
 
 	// 分隔多个中间件
 	middlewareList := strings.Split(annotations, ";")
@@ -340,28 +347,40 @@ func parseMiddlewareAnnotations(annotations string) map[string]map[string]string
 
 	paramRegex := regexp.MustCompile(`(\w+)\s*=\s*("[^"]+?")|(\w+)\s*=\s*('[^']+?')|(\w+)\s*=\s*([^,]+)`)
 
-	for _, middleware := range middlewareList {
-		params := paramRegexMatch.FindString(middleware)
+	for _, middle := range middlewareList {
+		params := paramRegexMatch.FindString(middle)
 		if params != "" {
-			middleware = middleware[:len(middleware)-len(params)]
+			middle = middle[:len(middle)-len(params)]
 			params = params[1 : len(params)-1]
 		}
 		// 解析参数  ttl=5,prefix="news",key="{id},{title}" 成为map,注意value是字符串中带逗号的情况
-		paramMap := make(map[string]string)
+		paramMap := sync.Map{}
 		if params != "" {
 			paramList := paramRegex.FindAllString(params, -1)
 			for _, param := range paramList {
 				kv := strings.Split(param, "=")
 				if len(kv) == 2 {
-					paramMap[kv[0]] = strings.TrimSpace(strings.Trim(kv[1], "\"'"))
+					paramMap.Store(kv[0], strings.TrimSpace(strings.Trim(kv[1], "\"'")))
+					//paramMap[kv[0]] = strings.TrimSpace(strings.Trim(kv[1], "\"'"))
 				}
 			}
 		}
-		result[middleware] = paramMap
+		middle = strings.TrimSpace(middle)
+		if middle == "" {
+			continue
+		}
+		middlewares = append(middlewares, middleware{
+			Name:   middle,
+			Params: paramMap,
+		})
 	}
 
-	return result
+	return middlewares
 }
+
+var regexMiddlewarePrefix = regexp.MustCompile(`(?i)^\s*@middleware`)
+var regexDescriptionPrefix = regexp.MustCompile(`(?i)^\s*@description`)
+var regexRouterPrefix = regexp.MustCompile(`(?i)^\s*@router`)
 
 func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 	//trim empty line
@@ -394,16 +413,16 @@ func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 						continue
 					}
 					text := strings.TrimSpace(strings.TrimPrefix(comment.Text, "//"))
-					if strings.HasPrefix(text, "@router") {
+					if regexRouterPrefix.MatchString(text) {
 						routerInfo := parseRouterComment(text)
 						if routerInfo != nil {
 							rest.Uri = routerInfo.Uri
 						}
-					} else if strings.HasPrefix(text, "@middleware") {
-						middlewares := parseMiddlewareAnnotations(text)
+					} else if regexMiddlewarePrefix.MatchString(text) {
+						middlewares := parseMiddlewareAnnotations(regexMiddlewarePrefix.ReplaceAllString(text, ""))
 						rest.Middlewares = middlewares
-					} else if strings.HasPrefix(text, "@description") {
-						rest.Description = strings.TrimSpace(strings.TrimPrefix(text, "@description"))
+					} else if regexDescriptionPrefix.MatchString(text) {
+						rest.Description = strings.TrimSpace(regexDescriptionPrefix.ReplaceAllString(text,""))
 					}
 				}
 			}
@@ -426,7 +445,7 @@ func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 						continue
 					}
 					text := strings.TrimSpace(strings.TrimPrefix(comment.Text, "//"))
-					if strings.HasPrefix(text, "@router") {
+					if regexRouterPrefix.MatchString(text) {
 						routerInfo := parseRouterComment(text)
 						if routerInfo != nil {
 							tmp := *routerInfo
@@ -435,11 +454,11 @@ func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 								currentRouterInfo.Method = tmp.Method
 							}
 						}
-					} else if strings.HasPrefix(text, "@middleware") {
-						middlewares := parseMiddlewareAnnotations(text)
+					} else if regexMiddlewarePrefix.MatchString(text) {
+						middlewares := parseMiddlewareAnnotations(regexMiddlewarePrefix.ReplaceAllString(text, ""))
 						currentRouterInfo.Middlewares = middlewares
-					} else if strings.HasPrefix(text, "@description") {
-						currentRouterInfo.Description = strings.TrimSpace(strings.TrimPrefix(text, "@description"))
+					} else if regexDescriptionPrefix.MatchString(text) {
+						currentRouterInfo.Description = strings.TrimSpace(regexDescriptionPrefix.ReplaceAllString(text,""))
 					}
 				}
 			}
