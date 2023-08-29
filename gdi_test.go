@@ -155,7 +155,6 @@ func TestAll3(t *testing.T) {
 		DIForTest(&s)
 		wg.Done()
 	}()
-	go DIForTest(&s)
 	wg.Wait()
 
 	if s.Student.Name != c.Student.Name {
