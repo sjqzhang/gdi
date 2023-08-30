@@ -1044,6 +1044,19 @@ func (gdi *GDIPool) PlaceHolder(objs ...interface{}) {
 	}
 }
 
-func (gdi *GDIPool) GetRestInfo(name string) (map[string]restInfo, error) {
-	return restMap,nil
+func (gdi *GDIPool) GetRestInfoByPatten(packagePatten string) (map[string]restInfo, error) {
+	if len(restMap) == 0 {
+		gdi.GetRouterInfoByPatten(packagePatten)
+
+	}
+
+	rest := make(map[string]restInfo)
+
+	regPatten := regexp.MustCompile(packagePatten)
+	for k, v := range restMap {
+		if regPatten.MatchString(k) {
+			rest[k] = v
+		}
+	}
+	return rest, nil
 }

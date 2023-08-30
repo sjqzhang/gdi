@@ -292,12 +292,13 @@ func (gdi *GDIPool) GenGDIRegisterFile(override bool) {
 
 }
 
-func GetRouterInfo(packageName string) (map[string]RouterInfo, error) {
-	return globalGDI.GetRouterInfo(packageName)
+func GetRouterInfoByPatten(packagePatten string) (map[string]RouterInfo, error) {
+	return globalGDI.GetRouterInfoByPatten(packagePatten)
 }
 
-func GetRestInfo(packageName string) (map[string]restInfo, error) {
-	return globalGDI.GetRestInfo(packageName)
+
+func GetRestInfoByPatten(packageName string) (map[string]restInfo, error) {
+	return globalGDI.GetRestInfoByPatten(packageName)
 }
 
 type middleware struct {
@@ -382,7 +383,7 @@ var regexMiddlewarePrefix = regexp.MustCompile(`(?i)^\s*@middleware`)
 var regexDescriptionPrefix = regexp.MustCompile(`(?i)^\s*@description`)
 var regexRouterPrefix = regexp.MustCompile(`(?i)^\s*@router`)
 
-func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
+func parseRouterInfo(sourceCode string, packageName string) ([]RouterInfo, error) {
 	//trim empty line
 	lines := strings.Split(sourceCode, "\n")
 	var newLines []string
@@ -422,7 +423,7 @@ func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 						middlewares := parseMiddlewareAnnotations(regexMiddlewarePrefix.ReplaceAllString(text, ""))
 						rest.Middlewares = middlewares
 					} else if regexDescriptionPrefix.MatchString(text) {
-						rest.Description = strings.TrimSpace(regexDescriptionPrefix.ReplaceAllString(text,""))
+						rest.Description = strings.TrimSpace(regexDescriptionPrefix.ReplaceAllString(text, ""))
 					}
 				}
 			}
@@ -431,7 +432,7 @@ func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 				if ts, ok := spec.(*ast.TypeSpec); ok {
 					if structType, ok := ts.Type.(*ast.StructType); ok {
 						rest.Controller = ts.Name.Name
-						restMap[rest.Controller] = rest
+						restMap[fmt.Sprintf("%v.%v", packageName, rest.Controller)] = rest
 						_ = structType
 					}
 				}
@@ -458,7 +459,7 @@ func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 						middlewares := parseMiddlewareAnnotations(regexMiddlewarePrefix.ReplaceAllString(text, ""))
 						currentRouterInfo.Middlewares = middlewares
 					} else if regexDescriptionPrefix.MatchString(text) {
-						currentRouterInfo.Description = strings.TrimSpace(regexDescriptionPrefix.ReplaceAllString(text,""))
+						currentRouterInfo.Description = strings.TrimSpace(regexDescriptionPrefix.ReplaceAllString(text, ""))
 					}
 				}
 			}
@@ -466,7 +467,7 @@ func parseRouterInfo(sourceCode string) ([]RouterInfo, error) {
 				currentRouterInfo.Handler = d.Name.String()
 			}
 			if currentRouterInfo.Controller == "" && d != nil {
-				currentRouterInfo.Controller = extractControllerName(d, sourceCode)
+				currentRouterInfo.Controller = fmt.Sprintf("%v.%v", packageName, extractControllerName(d, sourceCode))
 			}
 
 			if currentRouterInfo.Handler != "" && currentRouterInfo.Controller != "" {
@@ -612,6 +613,8 @@ func (gdi *GDIPool) genRouter(packageName string) ([]RouterInfo, error) {
 	if gdi.fs == nil {
 		return nil, nil
 	}
+	fs, err := gdi.fs.ReadDir(".")
+	fmt.Println(fs, err)
 	files, err := gdi.fs.ReadDir(packageName)
 	if err != nil {
 		gdi.error(err.Error())
@@ -623,7 +626,7 @@ func (gdi *GDIPool) genRouter(packageName string) ([]RouterInfo, error) {
 		if err != nil {
 			continue
 		}
-		infos, err := parseRouterInfo(string(byteContents))
+		infos, err := parseRouterInfo(string(byteContents), packageName)
 		if err != nil {
 			return infos, err
 		}
@@ -646,16 +649,44 @@ func (gdi *GDIPool) genRouter(packageName string) ([]RouterInfo, error) {
 	return routerInfos, nil
 }
 
-func (gdi *GDIPool) GetRouterInfo(packageName string) (map[string]RouterInfo, error) {
+func (gdi *GDIPool) GetRouterInfoByPatten(packagePatten string) (map[string]RouterInfo, error) {
+	var routerInfoMap = make(map[string]RouterInfo)
+	packageNames := make(map[string]string)
+	regPatten := regexp.MustCompile(packagePatten)
+	for k, _ := range packSources {
+		if regPatten.MatchString(k) {
+			packageNames[k] = k
+		}
+	}
+	for packageName, _ := range packageNames {
+
+		routerInfos, err := gdi.genRouter(packageName)
+		if err != nil {
+			gdi.log(err.Error())
+			return nil, err
+		}
+		for _, routerInfo := range routerInfos {
+			routerInfoMap[routerInfo.Controller+"."+routerInfo.Handler] = routerInfo
+		}
+
+	}
+	return routerInfoMap, nil
+
+}
+
+func (gdi *GDIPool) getRouterInfo(packageName string) (map[string]RouterInfo, error) {
+
+	routerInfoMap := make(map[string]RouterInfo)
+
 	routerInfos, err := gdi.genRouter(packageName)
 	if err != nil {
 		gdi.log(err.Error())
 		return nil, err
 	}
-	routerInfoMap := make(map[string]RouterInfo)
 	for _, routerInfo := range routerInfos {
 		routerInfoMap[routerInfo.Controller+"."+routerInfo.Handler] = routerInfo
 	}
+
 	return routerInfoMap, nil
 }
 
