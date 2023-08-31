@@ -7,6 +7,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -23,8 +24,58 @@ var sources map[string][]string = make(map[string][]string)
 var packSources map[string][]string = make(map[string][]string)
 var restMap map[string]restInfo = make(map[string]restInfo)
 
+var pkgName string
+
 func init() {
+	sources = make(map[string][]string)
+	packSources = make(map[string][]string)
+	restMap = make(map[string]restInfo)
 	sources = getGoSources()
+}
+
+func listFiles(fsys *embed.FS, fpath string, fsMap map[string][]string) error {
+	files, err := fs.ReadDir(fsys, fpath)
+	if err != nil {
+		globalGDI.error(fmt.Sprintf("read dir error: %s", err.Error()))
+		return err
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			//fmt.Printf("Directory: %s\n", file.Name())
+			if fpath != "." {
+				err = listFiles(fsys, fpath+"/"+file.Name(), fsMap)
+			} else {
+				err = listFiles(fsys, file.Name(), fsMap)
+			}
+			if err != nil {
+				return err
+			}
+		} else {
+			if !strings.HasSuffix(file.Name(), ".go") || strings.HasSuffix(file.Name(), "_test.go") {
+				continue
+			}
+			dirname:= fpath
+			if fpath != "." {
+				dirname = fpath + "/" + file.Name()
+			} else {
+				dirname = file.Name()
+			}
+
+			dir := path.Dir(dirname)
+			if _, ok := fsMap[dir]; !ok {
+				fsMap[dir] = make([]string, 0)
+			}
+			content, err := fsys.ReadFile(dirname)
+			if err != nil {
+				continue
+			}
+			fsMap[dir] = append(fsMap[dir], string(content))
+
+		}
+	}
+	//fmt.Println(fsMap)
+	return nil
 }
 
 func runCmd(cmds ...string) string {
@@ -55,6 +106,7 @@ func getDir() string {
 func getGoSources() map[string][]string {
 	packagePath := runCmd("go", "list", "-f", "{{.Module}}", "./...")
 	packagePath = strings.TrimSpace(strings.Split(packagePath, "\n")[0])
+	pkgName = packagePath
 	packages := getAllPackages()
 
 	goFiles := make(map[string][]string)
@@ -296,7 +348,6 @@ func GetRouterInfoByPatten(packagePatten string) (map[string]RouterInfo, error) 
 	return globalGDI.GetRouterInfoByPatten(packagePatten)
 }
 
-
 func GetRestInfoByPatten(packageName string) (map[string]restInfo, error) {
 	return globalGDI.GetRestInfoByPatten(packageName)
 }
@@ -308,6 +359,8 @@ type middleware struct {
 
 type RouterInfo struct {
 	Uri         string       `json:"uri"`
+	PkgName     string       `json:"pkg_name"`
+	PkgPath     string       `json:"pkg_path"`
 	Method      string       `json:"method"`
 	Controller  string       `json:"controller"`
 	Handler     string       `json:"handler"`
@@ -318,6 +371,8 @@ type RouterInfo struct {
 
 type restInfo struct {
 	Uri         string       `json:"uri"`
+	PkgName     string       `json:"pkg_name"`
+	PkgPath     string       `json:"pkg_path"`
 	Controller  string       `json:"controller"`
 	Middlewares []middleware `json:"middlewares"`
 	Description string       `json:"description"`
@@ -383,7 +438,7 @@ var regexMiddlewarePrefix = regexp.MustCompile(`(?i)^\s*@middleware`)
 var regexDescriptionPrefix = regexp.MustCompile(`(?i)^\s*@description`)
 var regexRouterPrefix = regexp.MustCompile(`(?i)^\s*@router`)
 
-func parseRouterInfo(sourceCode string, packageName string) ([]RouterInfo, error) {
+func parseRouterInfo(sourceCode string, pkgPath string) ([]RouterInfo, error) {
 	//trim empty line
 	lines := strings.Split(sourceCode, "\n")
 	var newLines []string
@@ -432,7 +487,9 @@ func parseRouterInfo(sourceCode string, packageName string) ([]RouterInfo, error
 				if ts, ok := spec.(*ast.TypeSpec); ok {
 					if structType, ok := ts.Type.(*ast.StructType); ok {
 						rest.Controller = ts.Name.Name
-						restMap[fmt.Sprintf("%v.%v", packageName, rest.Controller)] = rest
+						rest.PkgPath = pkgPath
+						rest.PkgName = pkgName
+						restMap[fmt.Sprintf("%v.%v",  pkgPath, rest.Controller)] = rest
 						_ = structType
 					}
 				}
@@ -467,13 +524,15 @@ func parseRouterInfo(sourceCode string, packageName string) ([]RouterInfo, error
 				currentRouterInfo.Handler = d.Name.String()
 			}
 			if currentRouterInfo.Controller == "" && d != nil {
-				currentRouterInfo.Controller = fmt.Sprintf("%v.%v", packageName, extractControllerName(d, sourceCode))
+				currentRouterInfo.Controller = fmt.Sprintf("%v.%v", pkgPath, extractControllerName(d, sourceCode))
 			}
 
 			if currentRouterInfo.Handler != "" && currentRouterInfo.Controller != "" {
 				if currentRouterInfo.Method == "" {
 					currentRouterInfo.Method = "ANY"
 				}
+				currentRouterInfo.PkgPath = pkgPath
+				currentRouterInfo.PkgName = pkgName
 				routerInfos = append(routerInfos, currentRouterInfo)
 			}
 
@@ -613,8 +672,6 @@ func (gdi *GDIPool) genRouter(packageName string) ([]RouterInfo, error) {
 	if gdi.fs == nil {
 		return nil, nil
 	}
-	fs, err := gdi.fs.ReadDir(".")
-	fmt.Println(fs, err)
 	files, err := gdi.fs.ReadDir(packageName)
 	if err != nil {
 		gdi.error(err.Error())
@@ -626,6 +683,7 @@ func (gdi *GDIPool) genRouter(packageName string) ([]RouterInfo, error) {
 		if err != nil {
 			continue
 		}
+		//fmt.Println(string(byteContents))
 		infos, err := parseRouterInfo(string(byteContents), packageName)
 		if err != nil {
 			return infos, err
@@ -695,7 +753,13 @@ func SetEmbedFs(fs *embed.FS) {
 }
 
 func (gdi *GDIPool) SetEmbedFs(fs *embed.FS) {
+	if fs == nil {
+		return
+	}
 	gdi.fs = fs
+	packSources = make(map[string][]string)
+	listFiles(fs, ".", packSources)
+
 }
 
 func (gdi *GDIPool) getFileConent(filePath string) ([]byte, error) {
