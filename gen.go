@@ -122,11 +122,11 @@ func longestCommonPrefix(strs []string) string {
 	return commonPrefix
 }
 
-func GeAppModuleName() string { //TODO：通过比较包路径，获取包名，不一定准确
-	return globalGDI.GeAppModuleName()
+func GetAppModuleName() string { //TODO：通过比较包路径，获取包名，不一定准确
+	return globalGDI.GetAppModuleName()
 }
 
-func (gdi *GDIPool) GeAppModuleName() string { //TODO：通过比较包路径，获取包名，不一定准确
+func (gdi *GDIPool) GetAppModuleName() string { //TODO：通过比较包路径，获取包名，不一定准确
 	if len(globalGDI.placeHolders) == 0 {
 		gdi.error("you must register at least three placeholder,you can call gdi.GenGDIRegisterFile(true) to register")
 		return ""
