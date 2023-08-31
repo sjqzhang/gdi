@@ -619,6 +619,7 @@ func parseMiddlewareComment(comment string) []string {
 	return nil
 }
 
+
 func extractControllerName(decl *ast.FuncDecl, sourceCode string) string {
 	recv := decl.Recv
 	if recv == nil {
@@ -627,7 +628,7 @@ func extractControllerName(decl *ast.FuncDecl, sourceCode string) string {
 	if len(recv.List) > 0 {
 		field := recv.List[0]
 		if len(field.Names) > 0 {
-			n := sourceCode[recv.Pos():recv.End()]
+			n := sourceCode[recv.Pos()-1:recv.End()-1]
 			ns := strings.Split(n, " ")
 			if len(ns) > 1 {
 				return strings.Trim(ns[1], "*) ")
