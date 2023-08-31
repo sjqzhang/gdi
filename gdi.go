@@ -1042,6 +1042,7 @@ func (gdi *GDIPool) PlaceHolder(objs ...interface{}) {
 	for _, obj := range objs {
 		gdi.placeHolders[reflect.TypeOf(obj).String()] = obj
 	}
+	pkgName=""//reset pkgName
 }
 
 func (gdi *GDIPool) GetRestInfoByPatten(packagePatten string) (map[string]restInfo, error) {

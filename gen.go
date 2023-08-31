@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"reflect"
 	"regexp"
 	"runtime"
 	"sort"
@@ -55,7 +56,7 @@ func listFiles(fsys *embed.FS, fpath string, fsMap map[string][]string) error {
 			if !strings.HasSuffix(file.Name(), ".go") || strings.HasSuffix(file.Name(), "_test.go") {
 				continue
 			}
-			dirname:= fpath
+			dirname := fpath
 			if fpath != "." {
 				dirname = fpath + "/" + file.Name()
 			} else {
@@ -101,6 +102,46 @@ func getDir() string {
 
 	return runCmd("go", "list", "-f", "{{.Dir}}")
 
+}
+
+func longestCommonPrefix(strs []string) string {
+	if len(strs) == 0 {
+		return ""
+	}
+	commonPrefix := ""
+	for i := 0; i < len(strs[0]); i++ {
+		char := strs[0][i]
+
+		for j := 1; j < len(strs); j++ {
+			if i >= len(strs[j]) || strs[j][i] != char {
+				return commonPrefix
+			}
+		}
+		commonPrefix += string(char)
+	}
+	return commonPrefix
+}
+
+func GeAppModuleName() string { //TODO：通过比较包路径，获取包名，不一定准确
+	return globalGDI.GeAppModuleName()
+}
+
+func (gdi *GDIPool) GeAppModuleName() string { //TODO：通过比较包路径，获取包名，不一定准确
+	if len(globalGDI.placeHolders) == 0 {
+		gdi.error("you must register at least three placeholder,you can call gdi.GenGDIRegisterFile(true) to register")
+		return ""
+	}
+	if !strings.Contains(pkgName, " ") && pkgName != "" {
+		return pkgName
+	}
+	var pkgPaths []string
+	for _, v := range globalGDI.placeHolders {
+		if reflect.TypeOf(v).Elem().PkgPath() != "" {
+			pkgPaths = append(pkgPaths, reflect.TypeOf(v).Elem().PkgPath())
+		}
+	}
+	pkgName = strings.TrimSuffix(longestCommonPrefix(pkgPaths), "/")
+	return pkgName
 }
 
 func getGoSources() map[string][]string {
@@ -489,7 +530,7 @@ func parseRouterInfo(sourceCode string, pkgPath string) ([]RouterInfo, error) {
 						rest.Controller = ts.Name.Name
 						rest.PkgPath = pkgPath
 						rest.PkgName = pkgName
-						restMap[fmt.Sprintf("%v.%v",  pkgPath, rest.Controller)] = rest
+						restMap[fmt.Sprintf("%v.%v", pkgPath, rest.Controller)] = rest
 						_ = structType
 					}
 				}
@@ -759,7 +800,6 @@ func (gdi *GDIPool) SetEmbedFs(fs *embed.FS) {
 	gdi.fs = fs
 	packSources = make(map[string][]string)
 	listFiles(fs, ".", packSources)
-
 }
 
 func (gdi *GDIPool) getFileConent(filePath string) ([]byte, error) {
