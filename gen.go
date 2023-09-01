@@ -378,7 +378,10 @@ func (gdi *GDIPool) GenGDIRegisterFile(override bool) {
 		ioutil.WriteFile(fn, []byte(genDependency()), 0755)
 	} else {
 		if override {
-			ioutil.WriteFile(fn, []byte(genDependency()), 0755)
+			content := genDependency()
+			if strings.Contains(content, "gdi.PlaceHolder") {//如果不存在自动导入，没有必要覆盖
+				ioutil.WriteFile(fn, []byte(content), 0755)
+			}
 		}
 	}
 	runCmd("gofmt", "-w", fn)
@@ -619,7 +622,6 @@ func parseMiddlewareComment(comment string) []string {
 	return nil
 }
 
-
 func extractControllerName(decl *ast.FuncDecl, sourceCode string) string {
 	recv := decl.Recv
 	if recv == nil {
@@ -628,7 +630,7 @@ func extractControllerName(decl *ast.FuncDecl, sourceCode string) string {
 	if len(recv.List) > 0 {
 		field := recv.List[0]
 		if len(field.Names) > 0 {
-			n := sourceCode[recv.Pos()-1:recv.End()-1]
+			n := sourceCode[recv.Pos()-1 : recv.End()-1]
 			ns := strings.Split(n, " ")
 			if len(ns) > 1 {
 				return strings.Trim(ns[1], "*) ")
@@ -799,8 +801,10 @@ func (gdi *GDIPool) SetEmbedFs(fs *embed.FS) {
 		return
 	}
 	gdi.fs = fs
-	packSources = make(map[string][]string)
-	listFiles(fs, ".", packSources)
+	if len(packSources) == 0 {
+		packSources = make(map[string][]string)
+		listFiles(fs, ".", packSources)
+	}
 }
 
 func (gdi *GDIPool) getFileConent(filePath string) ([]byte, error) {
