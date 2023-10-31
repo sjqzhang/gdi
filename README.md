@@ -18,7 +18,7 @@
 
 ## 注意事项
 
-- 注册对象必须写在init方法中(或在main中调用`gdi.GenGDIRegisterFile(false)`自动生成注册依赖)
+- 注册对象必须写在init方法中(或在main中调用`gdi.GenGDIRegisterFile(false)`自动生成注册依赖,注意需要进行二次编译)
 - 对象的类型必须是指针类型(接口类型除外)
 - 最后一定要调用 gdi.Init() 方法
 - 只支持单例实例，且只按类型进行反射注入
