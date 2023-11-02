@@ -14,7 +14,7 @@
 - 支持注解swagger路由
 - 支持注解中间件
 - 支持自动扫描指定包并注册对象
-- 支持动态获取go源码(AOP支持)
+- 支持动态获取go源码(AOP支持,具体参阅：https://github.com/sjqzhang/gdi_aop)
 
 ## 注意事项
 
