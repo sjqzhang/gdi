@@ -455,11 +455,14 @@ func parseMiddlewareAnnotations(annotations string) []middleware {
 
 	var middlewares []middleware
 
+
+	spliterReg:=regexp.MustCompile(`\w+\s*(\([^)]+\))|\w+\s*(\{[^\}]+\})|\w+`)
+
 	// 分隔多个中间件
-	middlewareList := strings.Split(annotations, ";")
+	middlewareList := spliterReg.FindAllString(annotations, -1)
 
 	// 正则表达式用于匹配参数
-	paramRegexMatch := regexp.MustCompile(`(\([^\)]+\))`)
+	paramRegexMatch := regexp.MustCompile(`(\([^\)]+\))|\{([^\}]+)\}`)
 
 	paramRegex := regexp.MustCompile(`(\w+)\s*=\s*("[^"]+?")|(\w+)\s*=\s*('[^']+?')|(\w+)\s*=\s*([^,]+)`)
 
