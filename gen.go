@@ -227,9 +227,11 @@ func getImportSource() map[string][]string {
 //如果是go1.16以上，使用go embed
 func checkGoVersion(version string) bool {
 	//判断go版本是否大于指定版本,大于指定版本返回true
+	version=strings.TrimPrefix(strings.ToLower(strings.TrimSpace(version)),"go")
 	curVersion := runtime.Version()
+	curVersion=strings.TrimPrefix(strings.ToLower(strings.TrimSpace(curVersion)),"go")
 	if len(curVersion) > len(version) {
-		curVersion = curVersion[0 : len(version)-1]
+		curVersion = curVersion[0 : len(version)]
 	}
 	if compareVersion(curVersion, version) >= 0 {
 		return true
@@ -329,7 +331,7 @@ func init() {
 
 	bflag := false
 
-	if checkGoVersion("go1.16") {
+	if checkGoVersion("go1.16.0") {
 		tpl = `package main
 /*
 重要说明：本文件由gdi自动生成，请勿手动修改，当被注册的结构体发生变化编译出错时，请删除本文件或清除所有文件内容，只需要保留本包声明即可。(注意：
