@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 
 	"github.com/sjqzhang/gdi/pkg/processor"
 )
@@ -18,21 +19,40 @@ var (
 )
 
 func debugf(format string, args ...interface{}) {
-	if debug {
-		// 获取调用者的文件和行号
-		_, file, line, _ := runtime.Caller(1)
-		// 只取文件名，不要完整路径
-		file = filepath.Base(file)
+	if !debug {
+		return
+	}
 
-		msg := fmt.Sprintf("[GDI_DEBUG][%s:%d] "+format+"\n", append([]interface{}{file, line}, args...)...)
-		// 将调试信息写入标准错误，而不是标准输出
-		fmt.Fprint(os.Stderr, msg)
-		if logFile != "" {
-			f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-			if err == nil {
-				defer f.Close()
-				f.WriteString(msg)
-			}
+	// 获取调用者的文件和行号
+	_, file, line, _ := runtime.Caller(1)
+	// 只取文件名，不要完整路径
+	file = filepath.Base(file)
+
+	msg := fmt.Sprintf("[GDI_DEBUG][%s:%d] "+format+"\n", append([]interface{}{file, line}, args...)...)
+
+	// 写入日志文件
+	if logFile != "" {
+		// 使用 O_APPEND 模式打开文件，如果文件不存在则创建
+		f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return
+		}
+		defer f.Close()
+
+		// 尝试获取文件锁
+		if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+			return
+		}
+		defer syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+
+		// 写入日志
+		if _, err := f.WriteString(msg); err != nil {
+			return
+		}
+
+		// 控制刷新到磁盘
+		if err := f.Sync(); err != nil {
+			return
 		}
 	}
 }
@@ -62,7 +82,6 @@ func main() {
 	if len(os.Args) == 3 && strings.HasPrefix(os.Args[2], "-V") {
 		debugf("版本检查命令，直接执行并返回输出")
 		cmd := exec.Command(os.Args[1], os.Args[2:]...)
-		cmd.Stderr = os.Stderr
 		output, err := cmd.Output()
 		if err != nil {
 			debugf("版本检查失败: %v", err)
@@ -111,12 +130,12 @@ func main() {
 
 	debugf("开始处理源文件: %s", sourceFile)
 
-	// 创建调试目录
+	// 创建调���目录
 	debugDir := ""
 	if debug {
 		debugDir = filepath.Join(os.TempDir(), "gdi_debug")
 		if err := os.MkdirAll(debugDir, 0755); err != nil {
-			debugf("创建调试���录失败: %v", err)
+			debugf("创建调试目录失败: %v", err)
 		}
 		debugf("创建调试目录成功: %s", debugDir)
 	}
@@ -158,7 +177,7 @@ func main() {
 }
 
 func executeOriginalTool() {
-	debugf("开始执行原始工具")
+	debugf("开始执行原���工具")
 	debugf("工具路径: %s", os.Args[1])
 	debugf("工具参数: %v", os.Args[2:])
 
