@@ -5,6 +5,7 @@ import (
 )
 
 func TestWrapFunction(t *testing.T) {
+	//带注解的原函数
 	src_func := `
 //go:gdi log 使用内置的日志注解
 //go:gdi timer(threshold="200ms") 使用内置的计时器注解
@@ -14,6 +15,7 @@ func (s *UserService) CreateUser(name string) string {
 	return "user:" + name
 }
 `
+	// 带注解的包装（展开）函数
 	target_func := `func (s *UserService) CreateUser(name string) string {
     // log装饰器（最外层）
     ctx_0 := &gdi.Context{
@@ -38,7 +40,7 @@ func (s *UserService) CreateUser(name string) string {
         }
 
         // 解析timer的参数
-        ctx_1.Properties["threshold"] = time.ParseDuration("200ms")
+        ctx_1.Properties["threshold"] = "200ms"
 
         // timer装饰器的前置处理
         if before, exists := gdi.GetBeforeAnnotationHandler("timer"); exists {
