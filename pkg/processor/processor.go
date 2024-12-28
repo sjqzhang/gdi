@@ -12,25 +12,6 @@ import (
 	"strings"
 )
 
-var (
-	debug   = os.Getenv("GDI_DEBUG") == "1"
-	logFile = os.Getenv("GDI_LOG")
-)
-
-func debugf(format string, args ...interface{}) {
-	if debug {
-		msg := fmt.Sprintf("[GDI_DEBUG] "+format+"\n", args...)
-		fmt.Print(msg)
-		if logFile != "" {
-			f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-			if err == nil {
-				defer f.Close()
-				f.WriteString(msg)
-			}
-		}
-	}
-}
-
 // ProcessFile 处理单个源文件
 func ProcessFile(sourceFile, tmpDir string) (string, error) {
 	debugf("开始处理文件: %s", sourceFile)
@@ -75,7 +56,7 @@ func ProcessFile(sourceFile, tmpDir string) (string, error) {
 	// 添加必要的导入
 	addRequiredImports(file)
 
-	// ���成新文件
+	// 生成新文件
 	newFile := filepath.Join(tmpDir, filepath.Base(sourceFile))
 	debugf("生成新文件: %s", newFile)
 
@@ -100,28 +81,58 @@ func ProcessFile(sourceFile, tmpDir string) (string, error) {
 }
 
 // 解析注解
-func parseAnnotations(comments *ast.CommentGroup) []string {
-	var annotations []string
+func parseAnnotations(comments *ast.CommentGroup) []Annotation {
+	var annotations []Annotation
 	if comments == nil {
 		return annotations
 	}
 
 	for _, c := range comments.List {
 		text := strings.TrimSpace(strings.TrimPrefix(c.Text, "//"))
-		if strings.HasPrefix(text, "@") {
+		if strings.HasPrefix(text, "go:gdi") {
 			// 提取注解名称和参数
-			text = strings.TrimPrefix(text, "@")
+			text = strings.TrimPrefix(text, "go:gdi")
+			text = strings.TrimSpace(text)
+
 			// 分离注解和注释
 			parts := strings.SplitN(text, " ", 2)
-			annotation := parts[0]
+			annotationText := parts[0]
 
-			// 处理带参数的注解
-			if strings.Contains(annotation, "(") {
-				annotations = append(annotations, annotation)
+			// 解析注解和参数
+			var annotation Annotation
+			if strings.Contains(annotationText, "(") {
+				// 带参数的注解
+				name := strings.Split(annotationText, "(")[0]
+				paramsStr := strings.TrimSuffix(strings.Split(annotationText, "(")[1], ")")
+				params := make(map[string]string)
+
+				// 解析参数
+				if paramsStr != "" {
+					paramPairs := strings.Split(paramsStr, ",")
+					for _, pair := range paramPairs {
+						pair = strings.TrimSpace(pair)
+						kv := strings.Split(pair, "=")
+						if len(kv) == 2 {
+							key := strings.Trim(strings.TrimSpace(kv[0]), `"`)
+							value := strings.Trim(strings.TrimSpace(kv[1]), `"`)
+							params[key] = value
+						}
+					}
+				}
+
+				annotation = Annotation{
+					Name:   name,
+					Params: params,
+				}
 			} else {
 				// 不带参数的注解
-				annotations = append(annotations, strings.TrimSpace(annotation))
+				annotation = Annotation{
+					Name:   strings.TrimSpace(annotationText),
+					Params: make(map[string]string),
+				}
 			}
+
+			annotations = append(annotations, annotation)
 		}
 	}
 	return annotations

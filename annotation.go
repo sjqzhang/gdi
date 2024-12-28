@@ -7,7 +7,7 @@ import (
 
 // Context 注解上下文
 type Context struct {
-	Target     interface{}            // 目标对象
+	Target     func()                 // 目标对象
 	Method     string                 // 方法名
 	Args       []interface{}          // 参数
 	Returns    []interface{}          // 返回值
