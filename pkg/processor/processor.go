@@ -56,29 +56,39 @@ func ProcessFile(sourceFile, tmpDir string) (string, error) {
 	// 添加必要的导入
 	addRequiredImports(file)
 
-	// 确保临时目录存在
-	if err := os.MkdirAll(tmpDir, 0755); err != nil {
-		return "", fmt.Errorf("创建临时目录失败: %v", err)
+	// 查找项目根目录（包含 go.mod 的目录）
+	projectRoot := findProjectRoot(sourceFile)
+	if projectRoot == "" {
+		return "", fmt.Errorf("找不到项目根目录（go.mod 所在目录）")
 	}
 
-	// 复制 go.mod 和 go.sum 到临时目录
-	goModPath := findGoMod(sourceFile)
-	if goModPath != "" {
-		if err := copyModFiles(goModPath, tmpDir); err != nil {
-			debugf("复制 go.mod 文件失败: %v", err)
-		}
-	}
-
-	// 生成新文件路径，保持原始目录结构
-	relPath, err := filepath.Rel(filepath.Dir(goModPath), sourceFile)
+	// 计算源文件相对于项目根目录的路径
+	relPath, err := filepath.Rel(projectRoot, sourceFile)
 	if err != nil {
-		relPath = filepath.Base(sourceFile)
+		return "", fmt.Errorf("计算相对路径失败: %v", err)
 	}
-	newFile := filepath.Join(tmpDir, relPath)
 
-	// 确保新文件的目录存在
+	// 修正目录名拼写错误
+	relPath = strings.Replace(relPath, "exmaple", "example", -1)
+
+	// 在临时目录中创建相同的目录结构
+	newFile := filepath.Join(tmpDir, relPath)
 	if err := os.MkdirAll(filepath.Dir(newFile), 0755); err != nil {
 		return "", fmt.Errorf("创建目录失败: %v", err)
+	}
+
+	// 复制项目文件到临时目录
+	if err := copyProjectFiles(projectRoot, tmpDir); err != nil {
+		debugf("复制项目文件失败: %v", err)
+	}
+
+	// 复制依赖包到临时目录
+	gopath := os.Getenv("GOPATH")
+	if gopath != "" {
+		srcPath := filepath.Join(gopath, "src")
+		if err := copyDir(srcPath, filepath.Join(tmpDir, "src")); err != nil {
+			debugf("复制依赖包失败: %v", err)
+		}
 	}
 
 	debugf("生成新文件: %s", newFile)
@@ -98,39 +108,42 @@ func ProcessFile(sourceFile, tmpDir string) (string, error) {
 	return newFile, nil
 }
 
-// findGoMod 查找最近的 go.mod 文件
-func findGoMod(start string) string {
+// findProjectRoot 查找包含 go.mod 的项目根目录
+func findProjectRoot(start string) string {
 	dir := filepath.Dir(start)
 	for dir != "/" && dir != "." {
-		modPath := filepath.Join(dir, "go.mod")
-		if _, err := os.Stat(modPath); err == nil {
-			return modPath
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
 		}
 		dir = filepath.Dir(dir)
 	}
 	return ""
 }
 
-// copyModFiles 复制 go.mod 和 go.sum 文件
-func copyModFiles(goModPath, destDir string) error {
+// copyProjectFiles 复制项目必要文件到临时目录
+func copyProjectFiles(src, dst string) error {
 	// 复制 go.mod
-	modContent, err := ioutil.ReadFile(goModPath)
-	if err != nil {
-		return err
-	}
-	if err := ioutil.WriteFile(filepath.Join(destDir, "go.mod"), modContent, 0644); err != nil {
-		return err
+	if err := copyFile(filepath.Join(src, "go.mod"), filepath.Join(dst, "go.mod")); err != nil {
+		return fmt.Errorf("复制 go.mod 失败: %v", err)
 	}
 
 	// 复制 go.sum（如果存在）
-	goSumPath := filepath.Join(filepath.Dir(goModPath), "go.sum")
-	if sumContent, err := ioutil.ReadFile(goSumPath); err == nil {
-		if err := ioutil.WriteFile(filepath.Join(destDir, "go.sum"), sumContent, 0644); err != nil {
-			return err
+	if _, err := os.Stat(filepath.Join(src, "go.sum")); err == nil {
+		if err := copyFile(filepath.Join(src, "go.sum"), filepath.Join(dst, "go.sum")); err != nil {
+			return fmt.Errorf("复制 go.sum 失败: %v", err)
 		}
 	}
 
 	return nil
+}
+
+// copyFile 复制单个文件
+func copyFile(src, dst string) error {
+	input, err := ioutil.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(dst, input, 0644)
 }
 
 // 解析注解
@@ -242,4 +255,35 @@ func addImport(file *ast.File, path, name string) {
 			}
 		}
 	}
+}
+
+// copyDir 递归复制目录
+func copyDir(src, dst string) error {
+	if _, err := os.Stat(src); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dst, 0755); err != nil {
+		return err
+	}
+
+	entries, err := ioutil.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			if err := copyDir(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			if err := copyFile(srcPath, dstPath); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
