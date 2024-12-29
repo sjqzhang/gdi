@@ -61,8 +61,16 @@ func ProcessFile(sourceFile, tmpDir string) (string, error) {
 		return "", fmt.Errorf("创建临时目录失败: %v", err)
 	}
 
+	// 复制 go.mod 和 go.sum 到临时目录
+	goModPath := findGoMod(sourceFile)
+	if goModPath != "" {
+		if err := copyModFiles(goModPath, tmpDir); err != nil {
+			debugf("复制 go.mod 文件失败: %v", err)
+		}
+	}
+
 	// 生成新文件路径，保持原始目录结构
-	relPath, err := filepath.Rel(filepath.Dir(sourceFile), sourceFile)
+	relPath, err := filepath.Rel(filepath.Dir(goModPath), sourceFile)
 	if err != nil {
 		relPath = filepath.Base(sourceFile)
 	}
@@ -88,6 +96,41 @@ func ProcessFile(sourceFile, tmpDir string) (string, error) {
 
 	debugf("文件处理完成: %s", newFile)
 	return newFile, nil
+}
+
+// findGoMod 查找最近的 go.mod 文件
+func findGoMod(start string) string {
+	dir := filepath.Dir(start)
+	for dir != "/" && dir != "." {
+		modPath := filepath.Join(dir, "go.mod")
+		if _, err := os.Stat(modPath); err == nil {
+			return modPath
+		}
+		dir = filepath.Dir(dir)
+	}
+	return ""
+}
+
+// copyModFiles 复制 go.mod 和 go.sum 文件
+func copyModFiles(goModPath, destDir string) error {
+	// 复制 go.mod
+	modContent, err := ioutil.ReadFile(goModPath)
+	if err != nil {
+		return err
+	}
+	if err := ioutil.WriteFile(filepath.Join(destDir, "go.mod"), modContent, 0644); err != nil {
+		return err
+	}
+
+	// 复制 go.sum（如果存在）
+	goSumPath := filepath.Join(filepath.Dir(goModPath), "go.sum")
+	if sumContent, err := ioutil.ReadFile(goSumPath); err == nil {
+		if err := ioutil.WriteFile(filepath.Join(destDir, "go.sum"), sumContent, 0644); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // 解析注解
