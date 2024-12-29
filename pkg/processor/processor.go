@@ -56,14 +56,24 @@ func ProcessFile(sourceFile, tmpDir string) (string, error) {
 	// 添加必要的导入
 	addRequiredImports(file)
 
-	// 生成新文件
-	newFile := filepath.Join(tmpDir, filepath.Base(sourceFile))
-	debugf("生成新文件: %s", newFile)
+	// 确保临时目录存在
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		return "", fmt.Errorf("创建临时目录失败: %v", err)
+	}
 
-	// 确保目录存在
+	// 生成新文件路径，保持原始目录结构
+	relPath, err := filepath.Rel(filepath.Dir(sourceFile), sourceFile)
+	if err != nil {
+		relPath = filepath.Base(sourceFile)
+	}
+	newFile := filepath.Join(tmpDir, relPath)
+
+	// 确保新文件的目录存在
 	if err := os.MkdirAll(filepath.Dir(newFile), 0755); err != nil {
 		return "", fmt.Errorf("创建目录失败: %v", err)
 	}
+
+	debugf("生成新文件: %s", newFile)
 
 	// 写入新文件
 	f, err := os.Create(newFile)

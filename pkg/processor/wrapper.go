@@ -22,6 +22,9 @@ func wrapFunction(file *ast.File, funcDecl *ast.FuncDecl, annotations []Annotati
 		currentBody = createDecoratorLayer(ann, currentBody, i, funcDecl)
 	}
 
+	// 清除原始注解注释
+	funcDecl.Doc = nil
+
 	// 更新函数体
 	funcDecl.Body = currentBody
 	return nil
@@ -54,60 +57,152 @@ func createDecoratorLayer(ann Annotation, innerBody *ast.BlockStmt, layerIndex i
 	// 添加前置处理
 	stmts = append(stmts, createBeforeHandlerStmt(ctxName, ann.Name))
 
-	// 包装内层函数调用
-	stmts = append(stmts, &ast.AssignStmt{
-		Lhs: []ast.Expr{ast.NewIdent("result")},
-		Tok: token.DEFINE,
-		Rhs: []ast.Expr{
-			&ast.FuncLit{
-				Type: &ast.FuncType{
-					Results: funcDecl.Type.Results,
+	// 根据返回值数量创建不同的处理逻辑
+	hasResults := funcDecl.Type.Results != nil && len(funcDecl.Type.Results.List) > 0
+	if !hasResults {
+		// 无返回值的情况
+		stmts = append(stmts,
+			// 定义函数
+			&ast.AssignStmt{
+				Lhs: []ast.Expr{ast.NewIdent("result")},
+				Tok: token.DEFINE,
+				Rhs: []ast.Expr{
+					&ast.FuncLit{
+						Type: &ast.FuncType{},
+						Body: innerBody,
+					},
 				},
-				Body: innerBody,
 			},
-		},
-	})
+			// 执行函数
+			&ast.ExprStmt{
+				X: &ast.CallExpr{
+					Fun: ast.NewIdent("result"),
+				},
+			},
+		)
+	} else if len(funcDecl.Type.Results.List) == 1 {
+		// 单返回值的情况
+		stmts = append(stmts,
+			// 定义函数
+			&ast.AssignStmt{
+				Lhs: []ast.Expr{ast.NewIdent("result")},
+				Tok: token.DEFINE,
+				Rhs: []ast.Expr{
+					&ast.FuncLit{
+						Type: &ast.FuncType{
+							Results: funcDecl.Type.Results,
+						},
+						Body: innerBody,
+					},
+				},
+			},
+			// 执行函数并获取返回值
+			&ast.AssignStmt{
+				Lhs: []ast.Expr{ast.NewIdent("returnValue")},
+				Tok: token.DEFINE,
+				Rhs: []ast.Expr{
+					&ast.CallExpr{
+						Fun: ast.NewIdent("result"),
+					},
+				},
+			},
+		)
+	} else {
+		// 多返回值的情况
+		returnValueNames := make([]ast.Expr, len(funcDecl.Type.Results.List))
+		returnValues := make([]ast.Expr, len(funcDecl.Type.Results.List))
+		for i := range funcDecl.Type.Results.List {
+			name := fmt.Sprintf("returnValue%d", i)
+			returnValueNames[i] = ast.NewIdent(name)
+			returnValues[i] = ast.NewIdent(name)
+		}
 
-	// 执行函数并获取结果
-	stmts = append(stmts, &ast.AssignStmt{
-		Lhs: []ast.Expr{ast.NewIdent("returnValue")},
-		Tok: token.DEFINE,
-		Rhs: []ast.Expr{
-			&ast.CallExpr{
-				Fun: ast.NewIdent("result"),
+		stmts = append(stmts,
+			// 定义函数
+			&ast.AssignStmt{
+				Lhs: []ast.Expr{ast.NewIdent("result")},
+				Tok: token.DEFINE,
+				Rhs: []ast.Expr{
+					&ast.FuncLit{
+						Type: &ast.FuncType{
+							Results: funcDecl.Type.Results,
+						},
+						Body: innerBody,
+					},
+				},
 			},
-		},
-	})
+			// 执行函数并获取返回值
+			&ast.AssignStmt{
+				Lhs: returnValueNames,
+				Tok: token.DEFINE,
+				Rhs: []ast.Expr{
+					&ast.CallExpr{
+						Fun: ast.NewIdent("result"),
+					},
+				},
+			},
+		)
+	}
 
 	// 设置结束时间
 	stmts = append(stmts, createSetEndTimeStmt(ctxName))
 
 	// 设置返回值
-	stmts = append(stmts, &ast.AssignStmt{
-		Lhs: []ast.Expr{
-			&ast.SelectorExpr{
-				X:   ast.NewIdent(ctxName),
-				Sel: ast.NewIdent("Returns"),
-			},
-		},
-		Tok: token.ASSIGN,
-		Rhs: []ast.Expr{
-			&ast.CompositeLit{
+	if hasResults {
+		var returnExpr ast.Expr
+		if len(funcDecl.Type.Results.List) == 1 {
+			returnExpr = ast.NewIdent("returnValue")
+		} else {
+			returnExprs := make([]ast.Expr, len(funcDecl.Type.Results.List))
+			for i := range funcDecl.Type.Results.List {
+				returnExprs[i] = ast.NewIdent(fmt.Sprintf("returnValue%d", i))
+			}
+			returnExpr = &ast.CompositeLit{
 				Type: &ast.ArrayType{
 					Elt: ast.NewIdent("interface{}"),
 				},
-				Elts: []ast.Expr{ast.NewIdent("returnValue")},
+				Elts: returnExprs,
+			}
+		}
+
+		stmts = append(stmts, &ast.AssignStmt{
+			Lhs: []ast.Expr{
+				&ast.SelectorExpr{
+					X:   ast.NewIdent(ctxName),
+					Sel: ast.NewIdent("Returns"),
+				},
 			},
-		},
-	})
+			Tok: token.ASSIGN,
+			Rhs: []ast.Expr{
+				&ast.CompositeLit{
+					Type: &ast.ArrayType{
+						Elt: ast.NewIdent("interface{}"),
+					},
+					Elts: []ast.Expr{returnExpr},
+				},
+			},
+		})
+	}
 
 	// 添加后置处理
 	stmts = append(stmts, createAfterHandlerStmt(ctxName, ann.Name))
 
 	// 返回结果
-	stmts = append(stmts, &ast.ReturnStmt{
-		Results: []ast.Expr{ast.NewIdent("returnValue")},
-	})
+	if !hasResults {
+		stmts = append(stmts, &ast.ReturnStmt{})
+	} else if len(funcDecl.Type.Results.List) == 1 {
+		stmts = append(stmts, &ast.ReturnStmt{
+			Results: []ast.Expr{ast.NewIdent("returnValue")},
+		})
+	} else {
+		returnExprs := make([]ast.Expr, len(funcDecl.Type.Results.List))
+		for i := range funcDecl.Type.Results.List {
+			returnExprs[i] = ast.NewIdent(fmt.Sprintf("returnValue%d", i))
+		}
+		stmts = append(stmts, &ast.ReturnStmt{
+			Results: returnExprs,
+		})
+	}
 
 	return &ast.BlockStmt{List: stmts}
 }
